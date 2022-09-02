@@ -1,9 +1,13 @@
-name: Man10Binary
+name: Man10Forex
 version: '1.0'
 main: red.man10.man10forex.Man10Forex
 softdepend:
   - Man10Bank
 api-version: 1.17
 commands:
-  binary:
+  mhl:
+    default: op
+  mfx:
+    default: op
+  mprice:
     default: op

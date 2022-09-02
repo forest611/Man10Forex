@@ -1,4 +1,4 @@
-package red.man10.man10binary
+package red.man10.man10forex.util
 
 import org.bukkit.Bukkit
 

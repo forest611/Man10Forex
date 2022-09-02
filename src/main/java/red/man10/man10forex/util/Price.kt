@@ -4,15 +4,18 @@ import com.google.gson.Gson
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.bukkit.Bukkit
+import org.bukkit.command.Command
+import org.bukkit.command.CommandExecutor
+import org.bukkit.command.CommandSender
 import kotlin.math.roundToInt
 
-object Price {
+object Price : CommandExecutor{
 
     private const val url = "http://taro:824/api/price"
     var spread : Double = 0.01  //スプレッド(Price)
 
     //価格データ取得
-    fun priceData():PriceData{
+    private fun priceData():PriceData?{
 
         var priceData : PriceData? = null
 
@@ -34,13 +37,13 @@ object Price {
             Bukkit.getLogger().info(e.message)
         }
 
-        return priceData!!
+        return priceData
     }
 
     //仲直取得
     fun price():Double{
         val price : Double
-        val data = priceData()
+        val data = priceData()?:return -1.0
         price = (data.bid+data.ask)/2.0
         return (price * 1000.0).roundToInt().toDouble()/1000.0
     }
@@ -61,5 +64,31 @@ object Price {
         val ask : Double,
         val time : String
     )
+
+    override fun onCommand(sender: CommandSender, command: Command, label: String, args: Array<out String>?): Boolean {
+
+        if (label!="mprice")return false
+
+        if (args.isNullOrEmpty()){
+            return true
+        }
+
+        when(args[0]){
+            "price" ->{
+                Thread{ sender.sendMessage("§d§l現在価格....§f§l${String.format("%,.3f",price())}") }.start()
+            }
+
+            "bid" ->{
+                Thread{ sender.sendMessage("§d§l現在買値....§c§l${String.format("%,.3f", bid())}") }.start()
+            }
+
+            "ask" ->{
+                Thread{ sender.sendMessage("§d§l現在売値....§b§l${String.format("%,.3f", ask())}") }.start()
+            }
+
+        }
+
+        return false
+    }
 
 }
