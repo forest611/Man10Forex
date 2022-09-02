@@ -1,0 +1,9 @@
+name: Man10Binary
+version: '1.0'
+main: red.man10.man10forex.Man10Forex
+softdepend:
+  - Man10Bank
+api-version: 1.17
+commands:
+  binary:
+    default: op
