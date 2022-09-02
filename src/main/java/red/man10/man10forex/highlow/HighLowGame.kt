@@ -2,6 +2,7 @@ package red.man10.man10forex.highlow
 
 import org.bukkit.Bukkit
 import org.bukkit.entity.Player
+import red.man10.man10forex.Man10Forex
 import red.man10.man10forex.Man10Forex.Companion.bank
 import red.man10.man10forex.util.MySQLManager
 import red.man10.man10forex.util.Price.price
@@ -14,10 +15,28 @@ object HighLowGame {
     private const val prefix = ""
     private var closeRequest = false
 
+    var minPrice = 50000.0
+    var maxPrice = 500000.0
+    var minSecond = 10
+    var maxSecond = 60
+
+    var isEnableGame = true
+
+    fun loadConfig(){
+        Man10Forex.plugin.reloadConfig()
+
+        minPrice = Man10Forex.plugin.config.getDouble("MinPrice")
+        maxPrice = Man10Forex.plugin.config.getDouble("MaxPrice")
+        minSecond = Man10Forex.plugin.config.getInt("MinSecond")
+        maxSecond = Man10Forex.plugin.config.getInt("MaxSecond")
+    }
+
+    //全ポジ閉じる
     fun closeAll(){
         closeRequest = true
     }
 
+    //返金
     fun payback(data:Position){
         val p = Bukkit.getOfflinePlayer(data.uuid)
         bank.deposit(data.uuid,data.betAmount,"Payback","払い戻し")
@@ -26,7 +45,7 @@ object HighLowGame {
     }
 
 
-    private fun entry(p:Player,betAmount: Double,exitSecond: Int,isHigh: Boolean){
+    fun entry(p:Player,betAmount: Double,exitSecond: Int,isHigh: Boolean){
         val position = Position(p.uniqueId,betAmount,0.0,isHigh,exitSecond, Date(), Date())
         positionList.add(position)
     }
@@ -68,7 +87,7 @@ object HighLowGame {
 
     }
 
-    fun binaryThread(){
+    fun highLowThread(){
 
         while (true){
 
@@ -76,7 +95,10 @@ object HighLowGame {
 
                 //払い戻し処理
                 if (closeRequest){
-                    positionList.forEach { payback(it) }
+                    positionList.forEach {
+                        payback(it)
+                        positionList.remove(it)
+                    }
                     closeRequest = false
                 }
 
@@ -95,6 +117,7 @@ object HighLowGame {
                     //Exit時間経過
                     if ((Date().time-it.entryTime.time)>1000*it.exitSecond){
                         Thread{ exit(it) }.start()
+                        positionList.remove(it)
                     }
 
                     //1秒経過
