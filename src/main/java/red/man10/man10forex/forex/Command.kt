@@ -87,8 +87,8 @@ object Command :CommandExecutor{
                 sender.sendMessage(prefix.append(sellButton).append(space).append(buyButton))
 
             }.start()
-            return true
 
+            return true
         }
 
         when(args[0]){
@@ -127,6 +127,7 @@ object Command :CommandExecutor{
                 }
 
                 Thread{ Forex.entry(sender,lots,isBuy) }.start()
+
                 return true
             }
 
@@ -154,6 +155,7 @@ object Command :CommandExecutor{
                 }
 
                 try {
+
                     val posId = UUID.fromString(args[1])
                     val tp = args[2].toDoubleOrNull()
 
@@ -166,13 +168,11 @@ object Command :CommandExecutor{
 
                 }catch (e:Exception){
                     sender.sendMessage("${prefix}入力に問題があります")
-
                 }
-
-
             }
 
             "sl" ->{
+
                 if (args.size!=3){
                     sender.sendMessage("${prefix}入力に問題があります")
                     return true
@@ -191,9 +191,7 @@ object Command :CommandExecutor{
 
                 }catch (e:Exception){
                     sender.sendMessage("${prefix}入力に問題があります")
-
                 }
-
             }
 
             "exit" ->{
@@ -206,7 +204,6 @@ object Command :CommandExecutor{
 
                 Thread{ Forex.exit(sender,posId) }.start()
                 return true
-
             }
 
             "reload" ->{
@@ -225,9 +222,7 @@ object Command :CommandExecutor{
                 if (!sender.hasPermission(OP)){ return true }
                 isEnable = false
             }
-
         }
-
 
         return true
     }

@@ -22,9 +22,11 @@ import java.util.*
 
 object Command : CommandExecutor{
     override fun onCommand(sender: CommandSender, command: Command, label: String, args: Array<out String>?): Boolean {
+
         if (label!="mhl")return false
 
         if (args.isNullOrEmpty()){
+
             if (!sender.hasPermission(HIGHLOW_USER))return false
             if (sender !is Player)return false
             Menu(sender).open()
@@ -93,7 +95,6 @@ object Command : CommandExecutor{
                         sender.sendMessage("${prefix}銀行のお金が足りません！")
                     }
                 }.start()
-
             }
 
             "reload" ->{
@@ -106,13 +107,11 @@ object Command : CommandExecutor{
 
             "off" ->{
                 if (!sender.hasPermission(OP)){ return true }
-
                 isEnableGame = false
             }
 
             "on" ->{
                 if (!sender.hasPermission(OP)){ return true }
-
                 isEnableGame = true
 
             }
@@ -126,7 +125,6 @@ object Command : CommandExecutor{
                     val list = mutableListOf<Pair<OfflinePlayer,Double>>()
 
                     while (rs.next()){
-
                         val p = Bukkit.getOfflinePlayer(UUID.fromString(rs.getString("uuid")))
                         val result = rs.getDouble(2)
                         list.add(Pair(p,result))
@@ -138,9 +136,7 @@ object Command : CommandExecutor{
                     }
 
                 }.start()
-
             }
-
         }
 
         return false

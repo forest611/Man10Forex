@@ -140,7 +140,6 @@ object Forex {
             if (position.sl!= 0.0 && bid<position.sl){
                 exit(position,false,position.sl)
             }
-
         }
 
         if (position.sell){
