@@ -31,6 +31,7 @@ class Man10Forex : JavaPlugin() {
 
         server.getPluginCommand("mhl")!!.setExecutor(Command)
         server.getPluginCommand("mprice")!!.setExecutor(Price)
+        server.getPluginCommand("mfx")!!.setExecutor(red.man10.man10forex.forex.Command)
 
         server.pluginManager.registerEvents(MenuFramework.MenuListener,this)
         MySQLManager.runAsyncMySQLQueue(plugin,"Man10Forex")
@@ -41,5 +42,6 @@ class Man10Forex : JavaPlugin() {
 
     override fun onDisable() {
         // Plugin shutdown logic
+
     }
 }
