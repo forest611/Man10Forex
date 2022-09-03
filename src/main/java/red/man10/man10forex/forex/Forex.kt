@@ -1,17 +1,20 @@
 package red.man10.man10forex.forex
 
+import org.bukkit.Bukkit
 import red.man10.man10bank.Bank
-import red.man10.man10forex.Man10Forex
 import red.man10.man10forex.Man10Forex.Companion.bank
 import red.man10.man10forex.Man10Forex.Companion.plugin
+import red.man10.man10forex.util.MySQLManager
 import red.man10.man10forex.util.Price
 import java.util.*
 
 object Forex {
 
-    var leverage = 100
-    var minLot : Double = 0.01
-    var maxLot : Double = 1000.0
+    private var leverage = 100
+    private var minLot : Double = 0.01
+    private var maxLot : Double = 1000.0
+
+    private val mysql:MySQLManager = MySQLManager(plugin,"Man10Forex")
 
     fun loadConfig(){
         plugin.reloadConfig()
@@ -20,19 +23,38 @@ object Forex {
         minLot = plugin.config.getDouble("MinLot")
         maxLot = plugin.config.getDouble("MaxLot")
     }
+//
+//    //idはポジションID
+//    private fun getPosition(id:UUID):Position?{
+//
+//        return null
+//    }
 
-    //idはポジションID
-    private fun getPosition(id:UUID):Position?{
-
-        return null
+    private fun closePosition(id: UUID,price: Double,profit:Double){
+        mysql.execute("UPDATE position_table SET `exit` = 1, exit_price = ${price}, profit = ${profit}, exit_date = now() WHERE position_id = '${id}';")
     }
 
-    private fun removePosition(id: UUID){
+    private fun updatePosition(position: Position){
 
     }
 
-    private fun savePosition(position: Position){
+    private fun createPosition(position: Position){
+        val p = Bukkit.getOfflinePlayer(position.uuid).name
 
+        mysql.execute("INSERT INTO position_table (position_id, player, uuid, lots, buy, sell, `exit`, entry_price, exit_price, profit, entry_date, exit_date) " +
+                "VALUES ('" +
+                "${position.positionID}', " +
+                "'${p}', " +
+                "'${position.uuid}', " +
+                "${position.lots}, " +
+                "${if (position.buy) 1 else 0}, " +
+                "${if (position.sell) 1 else 0}, " +
+                "DEFAULT, " +
+                "${position.entryPrice}, " +
+                "null, " +
+                "null, " +
+                "DEFAULT, " +
+                "null);")
     }
 
 
@@ -52,12 +74,14 @@ object Forex {
 
         val position = Position(id,p,lots,price,isBuy,!isBuy,0.0,0.0)
 
-        savePosition(position)
+        createPosition(position)
 
         return true
     }
 
     fun exit(position: Position){
+
+        val price = if (position.buy) Price.ask() else Price.bid()
         val profit = profit(position)?:return
 
         if (profit>0){
@@ -68,7 +92,7 @@ object Forex {
             bank.withdraw(position.uuid,-profit, "ForexLoss","FXの損失")
         }
 
-        removePosition(position.positionID)
+        closePosition(position.positionID,price,profit)
     }
 
     fun profit(position:Position): Double? {

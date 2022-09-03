@@ -2,6 +2,7 @@ package red.man10.man10forex
 
 import org.bukkit.plugin.java.JavaPlugin
 import red.man10.man10bank.BankAPI
+import red.man10.man10forex.forex.Forex
 import red.man10.man10forex.highlow.Command
 import red.man10.man10forex.highlow.HighLowGame
 import red.man10.man10forex.util.MenuFramework
@@ -26,6 +27,7 @@ class Man10Forex : JavaPlugin() {
         saveDefaultConfig()
 
         HighLowGame.loadConfig()
+        Forex.loadConfig()
 
         server.getPluginCommand("mhl")!!.setExecutor(Command)
         server.getPluginCommand("mprice")!!.setExecutor(Price)
@@ -33,9 +35,7 @@ class Man10Forex : JavaPlugin() {
         server.pluginManager.registerEvents(MenuFramework.MenuListener,this)
         MySQLManager.runAsyncMySQLQueue(plugin,"Man10Forex")
 
-        Thread{
-            HighLowGame.highLowThread()
-        }.start()
+        Thread{ HighLowGame.highLowThread() }.start()
     }
 
     override fun onDisable() {
