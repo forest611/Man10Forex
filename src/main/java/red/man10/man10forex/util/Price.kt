@@ -12,7 +12,7 @@ import kotlin.math.roundToInt
 object Price : CommandExecutor{
 
     private const val url = "http://taro:824/api/price"
-    var spread : Double = 0.01  //スプレッド(Price)
+    var spread : Double = 0.02  //スプレッド(Price)
 
     //価格データ取得
     private fun priceData():PriceData?{
@@ -49,11 +49,11 @@ object Price : CommandExecutor{
     }
 
     fun bid():Double{
-        return price()
+        return price()-spread/2.0
     }
 
     fun ask():Double{
-        return price()+ spread
+        return price()+ spread/2.0
     }
 
     data class PriceData(

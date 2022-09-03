@@ -7,7 +7,8 @@ import org.bukkit.command.CommandExecutor
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
 import red.man10.man10bank.Man10Bank.Companion.prefix
-import red.man10.man10forex.Man10Forex.Companion.BINARY_USER
+import red.man10.man10forex.Man10Forex.Companion.HIGHLOW_USER
+import red.man10.man10forex.Man10Forex.Companion.OP
 import red.man10.man10forex.Man10Forex.Companion.bank
 import red.man10.man10forex.Man10Forex.Companion.plugin
 import red.man10.man10forex.highlow.HighLowGame.isEnableGame
@@ -24,8 +25,9 @@ object Command : CommandExecutor{
         if (label!="mhl")return false
 
         if (args.isNullOrEmpty()){
-            if (!sender.hasPermission(BINARY_USER))return false
-
+            if (!sender.hasPermission(HIGHLOW_USER))return false
+            if (sender !is Player)return false
+            Menu(sender).open()
             return true
         }
 
@@ -36,21 +38,26 @@ object Command : CommandExecutor{
 
                 if (sender !is Player)return false
 
-                if (!sender.hasPermission("binary.user")){ return true }
+                if (!sender.hasPermission(HIGHLOW_USER)){ return true }
 
                 if (!isEnableGame){
-                    sender.sendMessage("${prefix}現在ハイアンドローの取引が停止しています")
+                    sender.sendMessage("${prefix}現在ハイ&ローの取引が停止しています")
                     return true
                 }
 
                 if (args.size!=4){
-                    sender.sendMessage("${prefix}/binary bet <金額> <秒> <high/low>")
+                    sender.sendMessage("${prefix}/mhl bet <金額> <秒> <h/l>")
+                    return true
+                }
+
+                if (args[3] != "h" && args[3] != "l"){
+                    sender.sendMessage("${prefix}上を予想するなら<h>、下を予想するなら<l>を入力してください！")
                     return true
                 }
 
                 val amount = args[1].toDoubleOrNull()
                 val sec = args[2].toIntOrNull()
-                val isHigh = args[3] == "high"
+                val isHigh = args[3] == "h"
 
                 if (amount == null || sec == null){
                     sender.sendMessage("${prefix}入力エラー!")
@@ -78,8 +85,8 @@ object Command : CommandExecutor{
                 }
 
                 Thread{
-                    if (bank.withdraw(sender.uniqueId,amount,"HighLowEntry","ハイアンドローエントリ")){
-                        sender.sendMessage("${prefix}ハイアンドローのエントリーをしました！")
+                    if (bank.withdraw(sender.uniqueId,amount,"HighLowEntry","ハイ&ローエントリ")){
+                        sender.sendMessage("${prefix}ハイ&ローのエントリーをしました！")
                         HighLowGame.entry(sender,amount,sec,isHigh)
                         return@Thread
                     }else{
@@ -91,20 +98,20 @@ object Command : CommandExecutor{
 
             "reload" ->{
 
-                if (!sender.hasPermission("binary.op")){ return true }
+                if (!sender.hasPermission(OP)){ return true }
                 loadConfig()
                 HighLowGame.closeAll()
 
             }
 
             "off" ->{
-                if (!sender.hasPermission("binary.op")){ return true }
+                if (!sender.hasPermission(OP)){ return true }
 
                 isEnableGame = false
             }
 
             "on" ->{
-                if (!sender.hasPermission("binary.op")){ return true }
+                if (!sender.hasPermission(OP)){ return true }
 
                 isEnableGame = true
 
@@ -113,7 +120,7 @@ object Command : CommandExecutor{
             "ranking" ->{
 
                 Thread{
-                    val mysql = MySQLManager(plugin,"Binary")
+                    val mysql = MySQLManager(plugin,"HighLow")
                     val rs = mysql.query("select uuid,sum(payout-bet) from log group by player order by sum(payout-bet) desc limit 10;")?:return@Thread
 
                     val list = mutableListOf<Pair<OfflinePlayer,Double>>()
@@ -125,7 +132,7 @@ object Command : CommandExecutor{
                         list.add(Pair(p,result))
                     }
 
-                    sender.sendMessage("§e§k§lXX§f§lハイアンドロー利益ランキング§e§k§lXX")
+                    sender.sendMessage("§e§k§lXX§f§lハイ&ロー利益ランキング§e§k§lXX")
                     list.forEach {
                         sender.sendMessage("§b§l${it.first.name}:§e§l${String.format("%,.0f", it.second)}円")
                     }

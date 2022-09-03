@@ -4,6 +4,8 @@ import org.bukkit.plugin.java.JavaPlugin
 import red.man10.man10bank.BankAPI
 import red.man10.man10forex.highlow.Command
 import red.man10.man10forex.highlow.HighLowGame
+import red.man10.man10forex.util.MenuFramework
+import red.man10.man10forex.util.MySQLManager
 import red.man10.man10forex.util.Price
 
 class Man10Forex : JavaPlugin() {
@@ -13,15 +15,24 @@ class Man10Forex : JavaPlugin() {
         lateinit var bank: BankAPI
 
         const val OP = "mforex.op"
-        const val BINARY_USER = "binary.user"
+        const val HIGHLOW_USER = "binary.user"
         const val FOREX_USER = "forex.user"
     }
     override fun onEnable() {
         // Plugin startup logic
         plugin = this
         bank = BankAPI(this)
+
+        saveDefaultConfig()
+
+        HighLowGame.loadConfig()
+
         server.getPluginCommand("mhl")!!.setExecutor(Command)
         server.getPluginCommand("mprice")!!.setExecutor(Price)
+
+        server.pluginManager.registerEvents(MenuFramework.MenuListener,this)
+        MySQLManager.runAsyncMySQLQueue(plugin,"Man10Forex")
+
         Thread{
             HighLowGame.highLowThread()
         }.start()

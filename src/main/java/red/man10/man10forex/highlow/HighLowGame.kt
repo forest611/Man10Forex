@@ -12,7 +12,7 @@ import java.util.*
 object HighLowGame {
 
     private val positionList = mutableListOf<Position>()
-    private const val prefix = ""
+    const val prefix = "§f§l[§b§lハイ§d§l&§c§lロー§f§l]"
     private var closeRequest = false
 
     var minPrice = 50000.0
@@ -39,11 +39,10 @@ object HighLowGame {
     //返金
     fun payback(data:Position){
         val p = Bukkit.getOfflinePlayer(data.uuid)
-        bank.deposit(data.uuid,data.betAmount,"Payback","払い戻し")
+        bank.deposit(data.uuid,data.betAmount,"Payback","ハイ&ロー返金")
         p.player?.sendMessage("${prefix}払い戻し処理が行われました")
 
     }
-
 
     fun entry(p:Player,betAmount: Double,exitSecond: Int,isHigh: Boolean){
         val position = Position(p.uniqueId,betAmount,0.0,isHigh,exitSecond, Date(), Date())
@@ -67,7 +66,7 @@ object HighLowGame {
             val diff = price - position.entryPrice
             val format = (if (diff>0) "§a§l(↑" else if (diff<0) "§c§l(↓" else "§f§l(→") + String.format("%,.3f",diff) + ")"
 
-            p.player!!.sendMessage("${prefix}指定時間経過！")
+            p.player!!.sendMessage("${prefix}${position.exitSecond}秒経過！")
             p.player!!.sendMessage("${prefix}現在...§d§l${String.format("%,.3f",price)} $format")
             p.player!!.sendMessage("${prefix}予想.......${predict}")
             Thread.sleep(1000)
@@ -76,7 +75,7 @@ object HighLowGame {
         }
 
         if (isWin){
-            bank.deposit(position.uuid,position.betAmount*2,"BinaryPayout","バイナリオプション払い戻し")
+            bank.deposit(position.uuid,position.betAmount*2,"HighLowPayout","ハイ&ローオプション払い戻し")
             MySQLManager.mysqlQueue.add("INSERT INTO log (player, uuid, bet, payout, date) " +
                     "VALUES ('${p.name}', '${p.uniqueId}', ${position.betAmount}, ${position.betAmount*2}, DEFAULT)")
             return
@@ -108,6 +107,7 @@ object HighLowGame {
                 positionList.forEach {
 
                     val p = Bukkit.getOfflinePlayer(it.uuid)
+                    var finishFlag = false
 
                     //エントリー価格決定
                     if (it.entryPrice == 0.0){
@@ -117,11 +117,12 @@ object HighLowGame {
                     //Exit時間経過
                     if ((Date().time-it.entryTime.time)>1000*it.exitSecond){
                         Thread{ exit(it) }.start()
+                        finishFlag = true
                         positionList.remove(it)
                     }
 
                     //1秒経過
-                    if ((Date().time-it.timer.time)>1000){
+                    if (!finishFlag && (Date().time-it.timer.time)>1000){
 
                         val diff = price - it.entryPrice
 
