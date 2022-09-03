@@ -68,7 +68,7 @@ object Price : CommandExecutor{
 
     override fun onCommand(sender: CommandSender, command: Command, label: String, args: Array<out String>?): Boolean {
 
-        if (label!="mprice")return false
+        if (label!="zfx")return false
 
         if (args.isNullOrEmpty()){
             return true

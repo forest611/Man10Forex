@@ -9,5 +9,5 @@ commands:
     default: op
   mfx:
     default: op
-  mprice:
+  zfx:
     default: op

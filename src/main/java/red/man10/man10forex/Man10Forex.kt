@@ -30,7 +30,7 @@ class Man10Forex : JavaPlugin() {
         Forex.loadConfig()
 
         server.getPluginCommand("mhl")!!.setExecutor(Command)
-        server.getPluginCommand("mprice")!!.setExecutor(Price)
+        server.getPluginCommand("zfx")!!.setExecutor(Price)
         server.getPluginCommand("mfx")!!.setExecutor(red.man10.man10forex.forex.Command)
 
         server.pluginManager.registerEvents(MenuFramework.MenuListener,this)
