@@ -36,6 +36,7 @@ class Man10Forex : JavaPlugin() {
         MySQLManager.runAsyncMySQLQueue(plugin,"Man10Forex")
 
         Thread{ HighLowGame.highLowThread() }.start()
+        Thread{ Forex.positionThread() }.start()
     }
 
     override fun onDisable() {

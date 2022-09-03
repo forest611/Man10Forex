@@ -1,7 +1,6 @@
 package red.man10.man10forex.forex
 
 import org.bukkit.Bukkit
-import red.man10.man10bank.Bank
 import red.man10.man10forex.Man10Forex.Companion.bank
 import red.man10.man10forex.Man10Forex.Companion.plugin
 import red.man10.man10forex.util.MySQLManager
@@ -13,6 +12,7 @@ object Forex {
     private var leverage = 100
     private var minLot : Double = 0.01
     private var maxLot : Double = 1000.0
+    private var lossCutPercent : Double = 20.0
 
     private val mysql:MySQLManager = MySQLManager(plugin,"Man10Forex")
 
@@ -22,26 +22,18 @@ object Forex {
         leverage = plugin.config.getInt("Leverage")
         minLot = plugin.config.getDouble("MinLot")
         maxLot = plugin.config.getDouble("MaxLot")
+        lossCutPercent = plugin.config.getDouble("LossCutPercent")
     }
-//
-//    //idはポジションID
-//    private fun getPosition(id:UUID):Position?{
-//
-//        return null
-//    }
 
+    @Synchronized
     private fun closePosition(id: UUID,price: Double,profit:Double){
         mysql.execute("UPDATE position_table SET `exit` = 1, exit_price = ${price}, profit = ${profit}, exit_date = now() WHERE position_id = '${id}';")
-    }
-
-    private fun updatePosition(position: Position){
-
     }
 
     private fun createPosition(position: Position){
         val p = Bukkit.getOfflinePlayer(position.uuid).name
 
-        mysql.execute("INSERT INTO position_table (position_id, player, uuid, lots, buy, sell, `exit`, entry_price, exit_price, profit, entry_date, exit_date) " +
+        MySQLManager.mysqlQueue.add("INSERT INTO position_table (position_id, player, uuid, lots, buy, sell, `exit`, entry_price, exit_price, profit, entry_date, exit_date) " +
                 "VALUES ('" +
                 "${position.positionID}', " +
                 "'${p}', " +
@@ -57,6 +49,34 @@ object Forex {
                 "null);")
     }
 
+    @Synchronized
+    private fun getUserPositions(uuid:UUID):List<Position>{
+
+        val rs = mysql.query("select * from position_table where uuid='${uuid}'")?:return Collections.emptyList()
+
+        val list = mutableListOf<Position>()
+
+        while (rs.next()){
+            val p = Position(
+                UUID.fromString(rs.getString("position_id")),
+                UUID.fromString(rs.getString("uuid")),
+                rs.getDouble("lots"),
+                rs.getDouble("entry_price"),
+                rs.getInt("buy")==1,
+                rs.getInt("sell")==1,
+                0.0,
+                0.0
+            )
+
+            list.add(p)
+        }
+
+        rs.close()
+        mysql.close()
+
+        return list
+    }
+
 
     fun entry(p:UUID,lots: Double,isBuy:Boolean):Boolean{
 
@@ -65,10 +85,6 @@ object Forex {
 
         //ロット数が証拠金より多い場合
         if (lots> maxLots(p,price)){
-            return false
-        }
-
-        if (!bank.withdraw(p, lotsToMan10Money(lots,price),"ForexEntry","FXのエントリー")){
             return false
         }
 
@@ -89,7 +105,9 @@ object Forex {
         }
 
         if (profit<0){
-            bank.withdraw(position.uuid,-profit, "ForexLoss","FXの損失")
+            if (!bank.withdraw(position.uuid,-profit, "ForexLoss","FXの損失")){
+                bank.withdraw(position.uuid, bank.getBalance(position.uuid),"ForexZeroCut","FXゼロカット")
+            }
         }
 
         closePosition(position.positionID,price,profit)
@@ -114,10 +132,42 @@ object Forex {
         return null
     }
 
+    //全ポジの含み益
+    fun allProfit(list:List<Position>):Double {
+
+        var profit = 0.0
+        list.forEach { profit+= profit(it)?:0.0 }
+
+        return profit
+    }
+
+    //必要証拠金
+    fun marginRequirement(list:List<Position>):Double{
+        var margin = 0.0
+        list.forEach { margin+= lotsToMan10Money(it.lots,it.entryPrice) }
+        return margin
+    }
+
+    //ロスカットラインに入っているか
+    fun isLossCutLine(uuid: UUID,list:List<Position>):Boolean{
+        //有効証拠金
+        val margin = bank.getBalance(uuid) + allProfit(list)
+        //必要証拠金
+        val require = marginRequirement(list)
+        //証拠金維持率
+        val percent = margin/require*100.0
+        if (percent< lossCutPercent){
+            return true
+        }
+        return false
+
+    }
+
     fun maxLots(uuid: UUID,price: Double):Double{
-        val bank = Bank.getBalance(uuid)
+        val bank = bank.getBalance(uuid)
         return bank / price * leverage / 1000
     }
+
 
     fun lotsToMan10Money(lots:Double,price: Double):Double{
         return price*lots*1000
@@ -136,6 +186,43 @@ object Forex {
         return pips/100.0
     }
 
+
+
+    //ポジション管理スレッド、ロスカット処理などを行う
+    fun positionThread(){
+
+        val threadDB = MySQLManager(plugin,"positionThread")
+
+        while (true){
+            try {
+
+                val rs = threadDB.query("select uuid from position_table where exit=0 group by uuid;")?:continue
+
+                while (rs.next()){
+
+                    val uuid = UUID.fromString(rs.getString("uuid"))
+                    var list = getUserPositions(uuid)
+                    if (list.isEmpty())continue
+
+                    //ポジション数を見て強制ロスカット
+                    list.forEach {
+                        if (!isLossCutLine(uuid,list))return@forEach
+                        exit(it)
+                        list = getUserPositions(uuid)
+                    }
+
+                }
+
+                rs.close()
+                mysql.close()
+
+                Thread.sleep(1000)
+
+            }catch (e:Exception){
+                Bukkit.getLogger().info(e.message)
+            }
+        }
+    }
 
 
     data class Position(
