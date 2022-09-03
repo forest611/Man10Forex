@@ -60,9 +60,9 @@ object Command :CommandExecutor{
 
                     val profit = profit(it)
 
-                    val eColor = (if (it.buy) "§a§l買" else "§c§l売") + " ${it.lots}ロット "
-                    val pColor = if (profit>0.0) "§b§l${String.format("%,.0f", profit)}" else if(profit<0.0) "§4§l${String.format("%,.0f", profit)}" else "§f§l${String.format("%,.0f", profit)}"
-                    val start = "E:${String.format("%,.3f", it.entryPrice)} "
+                    val eColor = (if (it.buy) "§a§lB" else "§c§lS") + " ${it.lots}ロット "
+                    val pColor = if (profit>0.0) "§b§l${String.format("%,.0f", profit)}円" else if(profit<0.0) "§4§l${String.format("%,.0f", profit)}円" else "§f§l${String.format("%,.0f", profit)}円"
+                    val start = "O:${String.format("%,.3f", it.entryPrice)} "
 
                     val diff = " (${String.format("%,.1f", Forex.diffPips(it))}Pips)"
 
