@@ -7,12 +7,13 @@ import org.bukkit.Bukkit
 import org.bukkit.command.Command
 import org.bukkit.command.CommandExecutor
 import org.bukkit.command.CommandSender
+import red.man10.man10forex.forex.Forex.spread
 import kotlin.math.roundToInt
 
 object Price : CommandExecutor{
 
     private const val url = "http://taro:824/api/price"
-    var spread : Double = 0.02  //スプレッド(Price)
+
 
     //価格データ取得
     private fun priceData():PriceData?{

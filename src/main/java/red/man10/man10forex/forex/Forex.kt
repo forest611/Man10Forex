@@ -17,6 +17,9 @@ object Forex {
     var maxLot : Double = 1000.0
     var lossCutPercent : Double = 20.0
     var unitSize : Int = 100000
+    var spread : Double = 0.02  //スプレッド(Price)
+
+    var isEnable = true
 
     private val mysql:MySQLManager = MySQLManager(plugin,"Man10Forex")
 
@@ -27,6 +30,7 @@ object Forex {
         minLot = plugin.config.getDouble("MinLot")
         maxLot = plugin.config.getDouble("MaxLot")
         lossCutPercent = plugin.config.getDouble("LossCutPercent")
+        spread = pipsToPrice(plugin.config.getDouble("SpreadPips"))
     }
 
     @Synchronized
@@ -53,6 +57,28 @@ object Forex {
                 "null);")
     }
 
+
+    fun setSLTP(position: Position){
+
+        var tp = 0.0
+        var sl = 0.0
+
+        if (position.buy){
+            val bid = Price.bid()
+            //tpが現在値より低い時は未設定に
+            tp = if (bid>position.tp){ 0.0 } else position.tp
+            sl = if (bid<position.sl){ 0.0 } else position.sl
+        }
+
+        if (position.sell){
+            val ask = Price.ask()
+            tp = if (ask<position.tp){ 0.0 } else position.tp
+            sl = if (ask>position.sl){ 0.0 } else position.sl
+        }
+
+        MySQLManager.mysqlQueue.add("UPDATE position_table SET sl_price = $sl , tp_price = $tp WHERE position_id ='${position.positionID}'")
+    }
+
     @Synchronized
     fun getUserPositions(uuid:UUID):List<Position>{
 
@@ -68,8 +94,8 @@ object Forex {
                 rs.getDouble("entry_price"),
                 rs.getInt("buy")==1,
                 rs.getInt("sell")==1,
-                0.0,
-                0.0
+                rs.getDouble("sl_price"),
+                rs.getDouble("tp_price")
             )
 
             list.add(p)
@@ -103,17 +129,21 @@ object Forex {
         return true
     }
 
-    private fun exit(position: Position){
+    private fun exit(position: Position,isLossCut:Boolean){
 
         val price = if (position.buy) Price.bid() else Price.ask()
         val profit = profit(position)
 
         if (profit>0){
-            bank.deposit(position.uuid,profit, "ForexProfit","FXの利益")
+            val msg = if (isLossCut) "強制ロスカット" else "FX利益"
+
+            bank.deposit(position.uuid,profit, "ForexProfit",msg)
         }
 
         if (profit<0){
-            if (!bank.withdraw(position.uuid,-profit, "ForexLoss","FXの損失")){
+            val msg = if (isLossCut) "強制ロスカット" else "FXの損失"
+
+            if (!bank.withdraw(position.uuid,-profit, "ForexLoss",msg)){
                 bank.withdraw(position.uuid, bank.getBalance(position.uuid),"ForexZeroCut","FXゼロカット")
             }
         }
@@ -128,7 +158,7 @@ object Forex {
 
         list.forEach {
             if (it.positionID == pos){
-                exit(it)
+                exit(it,false)
                 p.sendMessage("${prefix}ポジションをイグジットしました！(利益の確認は/ballog)")
                 return@forEach
             }
@@ -194,6 +224,9 @@ object Forex {
 
     //ロスカットラインに入っているか
     fun isLossCutLine(uuid: UUID,list:List<Position>):Boolean{
+
+        val p = Bukkit.getOfflinePlayer(uuid)
+
         //有効証拠金
         val margin = margin(uuid,list)
         //必要証拠金
@@ -201,6 +234,11 @@ object Forex {
         //証拠金維持率
         val percent = if (require==0.0) 0.0 else margin/require*100.0
         if (percent!=0.0 && percent< lossCutPercent){
+
+            if (p.isOnline){
+                p.player!!.sendMessage("${prefix}§4§l損失が激しいため強制ロスカットを行いました！")
+            }
+
             Bukkit.getLogger().info("LOSS CUT ${percent}%")
             return true
         }
@@ -208,13 +246,13 @@ object Forex {
 
     }
 
-    fun maxLots(uuid: UUID,price: Double):Double{
+    private fun maxLots(uuid: UUID, price: Double):Double{
         val margin = margin(uuid, getUserPositions(uuid))
         return margin * leverage  /(price* unitSize)
     }
 
 
-    fun lotsToMan10Money(lots:Double,price: Double):Double{
+    private fun lotsToMan10Money(lots:Double, price: Double):Double{
         return price*lots* unitSize
     }
 
@@ -223,11 +261,11 @@ object Forex {
     }
 
     //ドル円のみ対応
-    fun priceToPips(price: Double): Double {
+    private fun priceToPips(price: Double): Double {
         return price*100.0
     }
 
-    fun pipsToPrice(pips:Double):Double{
+    private fun pipsToPrice(pips:Double):Double{
         return pips/100.0
     }
 
@@ -254,7 +292,7 @@ object Forex {
                     //ポジション数を見て強制ロスカット
                     for (p in list){
                         if (!isLossCutLine(uuid,list))break
-                        exit(p)
+                        exit(p,true)
                         list = getUserPositions(uuid)
 
                     }

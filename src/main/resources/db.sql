@@ -25,9 +25,11 @@ create table if not exists position_table
     exit_price  double                             null,
     profit      double                             null,
     entry_date  datetime default CURRENT_TIMESTAMP null,
-    exit_date   datetime                           null
+    exit_date   datetime                           null,
+    sl_price    double   default 0                 null,
+    tp_price    double   default 0                 null
 );
 
 create index position_table_exit_uuid_index
-    on position_table (`exit`, uuid);
+    on man10_binary.position_table (`exit`, uuid);
 

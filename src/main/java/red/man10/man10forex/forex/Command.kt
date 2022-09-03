@@ -9,6 +9,7 @@ import org.bukkit.entity.Player
 import red.man10.man10forex.Man10Forex.Companion.bank
 import red.man10.man10forex.forex.Forex.allProfit
 import red.man10.man10forex.forex.Forex.getUserPositions
+import red.man10.man10forex.forex.Forex.isEnable
 import red.man10.man10forex.forex.Forex.lossCutPercent
 import red.man10.man10forex.forex.Forex.margin
 import red.man10.man10forex.forex.Forex.marginRequirement
@@ -41,12 +42,12 @@ object Command :CommandExecutor{
                 val profitColor = if (allProfit<0) "§4§l" else if (allProfit>0) "§b§l" else "§f§l"
                 val percentColor =  if (percent==0.0) "§f§l" else if (percent< lossCutPercent*1.5) "§4§l" else if (percent< lossCutPercent*2.0) "§6§l"  else "§f§l"
 
-                sender.sendMessage("${prefix}=============[MT10]=============")
-                sender.sendMessage("${prefix}残高:${String.format("%,.0f", bank)}")
+                sender.sendMessage("${prefix}§e§l=============[Man10Trader(MT10)]=============")
+                sender.sendMessage("${prefix}銀行残高:${String.format("%,.0f", bank)}")
                 sender.sendMessage("${prefix}有効金額:${String.format("%,.0f", margin)}")
                 sender.sendMessage("${prefix}${profitColor}評価額:${String.format("%,.0f", allProfit)}")
-                sender.sendMessage("${prefix}${percentColor}証拠金維持率:${String.format("%,.3f", percent)}%")
-                sender.sendMessage("${prefix}==保有ポジション(クリックしてイグジット(決済)できます)==")
+                sender.sendMessage("${prefix}${percentColor}維持率:${String.format("%,.3f", percent)}%")
+                sender.sendMessage("${prefix}===保有ポジション(クリックしてイグジット(利益確定))===")
 
                 list.forEach {
 
@@ -67,10 +68,11 @@ object Command :CommandExecutor{
                 }
 
                 val prefix = Component.text(prefix)
-                val sellButton = Component.text("§c§l[売る]    ").clickEvent(ClickEvent.suggestCommand("/mfx sell "))
-                val buyButton = Component.text("§a§l[買う]").clickEvent(ClickEvent.suggestCommand("/mfx buy "))
+                val sellButton = Component.text("§c§l§n[売る]").clickEvent(ClickEvent.suggestCommand("/mfx sell "))
+                val space = Component.text("    ")
+                val buyButton = Component.text("§a§l§n[買う]").clickEvent(ClickEvent.suggestCommand("/mfx buy "))
 
-                sender.sendMessage(prefix.append(sellButton).append(buyButton))
+                sender.sendMessage(prefix.append(sellButton).append(space).append(buyButton))
 
             }.start()
             return true
@@ -80,6 +82,11 @@ object Command :CommandExecutor{
         when(args[0]){
 
             "entry" ->{
+
+                if (!isEnable){
+                    sender.sendMessage("${prefix}現在取引所がクローズしております")
+                    return true
+                }
 
                 if (args.size!=3){
                     sender.sendMessage("${prefix}/mfx entry <b/s> <ロット数> (買う場合はb 売る場合はs)")
@@ -136,6 +143,18 @@ object Command :CommandExecutor{
                 Thread{ Forex.exit(sender,posId) }.start()
                 return true
 
+            }
+
+            "reload" ->{
+                Forex.loadConfig()
+            }
+
+            "on" ->{
+                isEnable = true
+            }
+
+            "off" ->{
+                isEnable = false
             }
 
         }
