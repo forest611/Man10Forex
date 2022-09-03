@@ -58,25 +58,103 @@ object Forex {
     }
 
 
-    fun setSLTP(position: Position){
+    fun setTP(p:Player,pos:UUID,tp: Double){
 
-        var tp = 0.0
-        var sl = 0.0
+        val list = getUserPositions(p.uniqueId)
+        var position : Position? = null
+
+        list.forEach {
+            if (it.positionID == pos){
+                position = it
+                return@forEach
+            }
+        }
+
+        if (position == null)return
+
+        if (position!!.buy){
+            val bid = Price.bid()
+            //tpが現在値より低い時は未設定に
+            position!!.tp = if (bid>tp){ 0.0 } else tp
+        }
+
+        if (position!!.sell){
+            val ask = Price.ask()
+            position!!.tp = if (ask<tp){ 0.0 } else tp
+        }
+
+        if (position!!.tp == 0.0){
+            p.sendMessage("${prefix}TPの価格に問題があります")
+        }else{
+            p.sendMessage("${prefix}設定完了")
+        }
+
+        MySQLManager.mysqlQueue.add("UPDATE position_table SET tp_price = ${position!!.tp} WHERE position_id ='${pos}'")
+    }
+
+
+    fun setSL(p:Player,pos:UUID,sl: Double){
+
+        val list = getUserPositions(p.uniqueId)
+        var position : Position? = null
+
+        list.forEach {
+            if (it.positionID == pos){
+                position = it
+                return@forEach
+            }
+        }
+
+        if (position == null)return
+
+        if (position!!.buy){
+            val bid = Price.bid()
+            //slが現在値より高い時は未設定に
+            position!!.sl = if (bid<sl){ 0.0 } else sl
+        }
+
+        if (position!!.sell){
+            val ask = Price.ask()
+            position!!.tp = if (ask>sl){ 0.0 } else sl
+        }
+
+        if (position!!.sl == 0.0){
+            p.sendMessage("${prefix}TPの価格に問題があります")
+        }else{
+            p.sendMessage("${prefix}設定完了")
+        }
+
+
+        MySQLManager.mysqlQueue.add("UPDATE position_table SET sl_price = ${position!!.sl} WHERE position_id ='${pos}'")
+    }
+
+    fun checkTouchTPSL(position: Position){
 
         if (position.buy){
             val bid = Price.bid()
-            //tpが現在値より低い時は未設定に
-            tp = if (bid>position.tp){ 0.0 } else position.tp
-            sl = if (bid<position.sl){ 0.0 } else position.sl
+
+            if (position.tp!= 0.0 && bid>position.tp){
+                exit(position,false,position.tp)
+            }
+
+            if (position.sl!= 0.0 && bid<position.sl){
+                exit(position,false,position.sl)
+            }
+
         }
 
         if (position.sell){
             val ask = Price.ask()
-            tp = if (ask<position.tp){ 0.0 } else position.tp
-            sl = if (ask>position.sl){ 0.0 } else position.sl
+
+            if (position.tp!= 0.0 && ask<position.tp){
+                exit(position,false,position.tp)
+            }
+
+            if (position.sl!= 0.0 && ask>position.sl){
+                exit(position,false,position.sl)
+            }
         }
 
-        MySQLManager.mysqlQueue.add("UPDATE position_table SET sl_price = $sl , tp_price = $tp WHERE position_id ='${position.positionID}'")
     }
 
     @Synchronized
@@ -129,9 +207,9 @@ object Forex {
         return true
     }
 
-    private fun exit(position: Position,isLossCut:Boolean){
+    private fun exit(position: Position,isLossCut:Boolean,exitPrice: Double? = null){
 
-        val price = if (position.buy) Price.bid() else Price.ask()
+        val price = exitPrice ?: if (position.buy) Price.bid() else Price.ask()
         val profit = profit(position)
 
         if (profit>0){
@@ -289,12 +367,15 @@ object Forex {
                     var list = getUserPositions(uuid)
                     if (list.isEmpty())continue
 
-                    //ポジション数を見て強制ロスカット
+                    //強制ロスカット、SL TPなど
                     for (p in list){
-                        if (!isLossCutLine(uuid,list))break
-                        exit(p,true)
-                        list = getUserPositions(uuid)
 
+                        checkTouchTPSL(p)
+
+                        if (isLossCutLine(uuid,list)){
+                            exit(p,true)
+                            list = getUserPositions(uuid)
+                        }
                     }
 
                 }
@@ -316,8 +397,8 @@ object Forex {
         val entryPrice:Double,
         val buy:Boolean,
         val sell:Boolean,
-        val sl:Double,
-        val tp:Double
+        var sl:Double,
+        var tp:Double
     )
 
 }

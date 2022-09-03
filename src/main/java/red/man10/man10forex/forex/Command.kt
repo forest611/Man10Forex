@@ -6,6 +6,8 @@ import org.bukkit.command.Command
 import org.bukkit.command.CommandExecutor
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
+import red.man10.man10forex.Man10Forex.Companion.FOREX_USER
+import red.man10.man10forex.Man10Forex.Companion.OP
 import red.man10.man10forex.Man10Forex.Companion.bank
 import red.man10.man10forex.forex.Forex.allProfit
 import red.man10.man10forex.forex.Forex.getUserPositions
@@ -17,6 +19,9 @@ import red.man10.man10forex.forex.Forex.maxLot
 import red.man10.man10forex.forex.Forex.minLot
 import red.man10.man10forex.forex.Forex.prefix
 import red.man10.man10forex.forex.Forex.profit
+import red.man10.man10forex.forex.Forex.setSL
+import red.man10.man10forex.forex.Forex.setTP
+import java.lang.Exception
 import java.util.*
 
 object Command :CommandExecutor{
@@ -26,6 +31,8 @@ object Command :CommandExecutor{
         if (sender!is Player)return false
 
         if (args.isNullOrEmpty()){
+
+            if (!sender.hasPermission(FOREX_USER)){ return true }
 
             val uuid = sender.uniqueId
 
@@ -55,15 +62,20 @@ object Command :CommandExecutor{
 
                     val eColor = (if (it.buy) "§a§l買" else "§c§l売") + " ${it.lots}ロット "
                     val pColor = if (profit>0.0) "§b§l${String.format("%,.0f", profit)}" else if(profit<0.0) "§4§l${String.format("%,.0f", profit)}" else "§f§l${String.format("%,.0f", profit)}"
-                    val start = " 開始値段:${String.format("%,.3f", it.entryPrice)} "
+                    val start = "E:${String.format("%,.3f", it.entryPrice)} "
 
                     val diff = " (${String.format("%,.1f", Forex.diffPips(it))}Pips)"
 
                     val msg = Component.text(prefix+eColor+start+pColor+diff).
                     clickEvent(ClickEvent.runCommand("/mfx exit ${it.positionID}"))
 
+                    val showTP = " §a§n[TP${if (it.tp!=0.0) "(${String.format("%,.3f", it.tp)})" else ""}]"
+                    val showSL = " §c§n[SL${if (it.sl!=0.0) "(${String.format("%,.3f", it.sl)})" else ""}]"
 
-                    sender.sendMessage(msg)
+                    val compTP = Component.text(showTP).clickEvent(ClickEvent.suggestCommand("/mfx tp ${it.positionID} "))
+                    val compSL = Component.text(showSL).clickEvent(ClickEvent.suggestCommand("/mfx sl ${it.positionID} "))
+
+                    sender.sendMessage(msg.append(compTP).append(compSL))
 
                 }
 
@@ -82,6 +94,8 @@ object Command :CommandExecutor{
         when(args[0]){
 
             "entry" ->{
+
+                if (!sender.hasPermission(FOREX_USER)){ return true }
 
                 if (!isEnable){
                     sender.sendMessage("${prefix}現在取引所がクローズしております")
@@ -132,6 +146,56 @@ object Command :CommandExecutor{
                 sender.performCommand("mfx entry s ${args[1]}")
             }
 
+            "tp" ->{
+
+                if (args.size!=3){
+                    sender.sendMessage("${prefix}入力に問題があります")
+                    return true
+                }
+
+                try {
+                    val posId = UUID.fromString(args[1])
+                    val tp = args[2].toDoubleOrNull()
+
+                    if (tp==null){
+                        sender.sendMessage("${prefix}数字で入力してください！")
+                        return true
+                    }
+
+                    Thread{ setTP(sender,posId,tp) }.start()
+
+                }catch (e:Exception){
+                    sender.sendMessage("${prefix}入力に問題があります")
+
+                }
+
+
+            }
+
+            "sl" ->{
+                if (args.size!=3){
+                    sender.sendMessage("${prefix}入力に問題があります")
+                    return true
+                }
+
+                try {
+                    val posId = UUID.fromString(args[1])
+                    val sl = args[2].toDoubleOrNull()
+
+                    if (sl==null){
+                        sender.sendMessage("${prefix}数字で入力してください！")
+                        return true
+                    }
+
+                    Thread{ setSL(sender,posId,sl) }.start()
+
+                }catch (e:Exception){
+                    sender.sendMessage("${prefix}入力に問題があります")
+
+                }
+
+            }
+
             "exit" ->{
                 if (args.size!=2){
                     sender.sendMessage("${prefix}イグジット失敗！、正しくイグジットできていない可能性があります！")
@@ -146,14 +210,19 @@ object Command :CommandExecutor{
             }
 
             "reload" ->{
+
+                if (!sender.hasPermission(OP)){ return true }
+
                 Forex.loadConfig()
             }
 
             "on" ->{
+                if (!sender.hasPermission(OP)){ return true }
                 isEnable = true
             }
 
             "off" ->{
+                if (!sender.hasPermission(OP)){ return true }
                 isEnable = false
             }
 
