@@ -6,7 +6,6 @@ import org.bukkit.command.Command
 import org.bukkit.command.CommandExecutor
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
-import red.man10.man10bank.Man10Bank.Companion.prefix
 import red.man10.man10forex.Man10Forex.Companion.HIGHLOW_USER
 import red.man10.man10forex.Man10Forex.Companion.OP
 import red.man10.man10forex.Man10Forex.Companion.bank
@@ -17,6 +16,7 @@ import red.man10.man10forex.highlow.HighLowGame.maxPrice
 import red.man10.man10forex.highlow.HighLowGame.maxSecond
 import red.man10.man10forex.highlow.HighLowGame.minPrice
 import red.man10.man10forex.highlow.HighLowGame.minSecond
+import red.man10.man10forex.highlow.HighLowGame.prefix
 import red.man10.man10forex.util.MySQLManager
 import java.util.*
 
