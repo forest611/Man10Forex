@@ -80,11 +80,11 @@ object Price : CommandExecutor{
             }
 
             "bid" ->{
-                Thread{ sender.sendMessage("§d§l現在買値....§c§l${String.format("%,.3f", bid())}") }.start()
+                Thread{ sender.sendMessage("§d§l現在売値....§c§l${String.format("%,.3f", bid())}") }.start()
             }
 
             "ask" ->{
-                Thread{ sender.sendMessage("§d§l現在売値....§b§l${String.format("%,.3f", ask())}") }.start()
+                Thread{ sender.sendMessage("§d§l現在買値....§b§l${String.format("%,.3f", ask())}") }.start()
             }
 
         }

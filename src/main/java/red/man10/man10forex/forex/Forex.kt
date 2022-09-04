@@ -196,6 +196,10 @@ object Forex {
         val maxLots = maxLots(p.uniqueId,price)
         //ロット数が証拠金より多い場合
         if (lots> maxLots){
+            if (lots< minLot){
+                p.sendMessage("${prefix}残高があまりにも少ないため、エントリーができません")
+                return false
+            }
             p.sendMessage("${prefix}あなたがエントリーできる最大ロット数は${String.format("%,.2f", maxLots)}までです！")
             return false
         }
