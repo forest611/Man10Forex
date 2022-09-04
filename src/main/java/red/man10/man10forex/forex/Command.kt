@@ -253,7 +253,6 @@ object Command :CommandExecutor{
                         }
                         return@Thread
                     }
-
                     sender.sendMessage("${prefix}銀行の残高が足りません")
 
                 }.start()
@@ -280,7 +279,9 @@ object Command :CommandExecutor{
 
                     if (ForexBank.withdraw(uuid,amount,"ToBank","銀行へ出金")){
                         bank.deposit(uuid,amount, "FX->Bank","FX口座から銀行へ")
+                        return@Thread
                     }
+                    sender.sendMessage("${prefix}FX口座の残高が足りません")
 
                 }.start()
 

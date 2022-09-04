@@ -22,6 +22,10 @@ object Forex {
 
     private val mysql:MySQLManager = MySQLManager(plugin,"Man10Forex")
 
+    init {
+        Thread{ positionThread() }.start()
+    }
+
     fun loadConfig(){
         plugin.reloadConfig()
 
@@ -118,7 +122,7 @@ object Forex {
         }
 
         if (position!!.sl == 0.0){
-            p.sendMessage("${prefix}TPの価格に問題があります")
+            p.sendMessage("${prefix}SLの価格に問題があります")
         }else{
             p.sendMessage("${prefix}設定完了")
         }
@@ -221,7 +225,7 @@ object Forex {
 
             if (!ForexBank.withdraw(position.uuid,-profit, "ForexLoss",msg)){
                 //ゼロカット
-                ForexBank.setBalance(position.uuid, ForexBank.getBalance(position.uuid))
+                ForexBank.setBalance(position.uuid, 0.0)
             }
         }
 
@@ -304,6 +308,8 @@ object Forex {
     //ロスカットラインに入っているか
     fun isLossCutLine(uuid: UUID,list:List<Position>):Boolean{
 
+        if (list.isEmpty())return true
+
         val p = Bukkit.getOfflinePlayer(uuid)
 
         //有効証拠金
@@ -312,7 +318,7 @@ object Forex {
         val require = marginRequirement(list)
         //証拠金維持率
         val percent = if (require==0.0) 0.0 else margin/require*100.0
-        if (percent!=0.0 && percent< lossCutPercent){
+        if (percent< lossCutPercent){
 
             if (p.isOnline){
                 p.player!!.sendMessage("${prefix}§4§l損失が激しいため強制ロスカットを行いました！")
@@ -351,7 +357,9 @@ object Forex {
 
 
     //ポジション管理スレッド、ロスカット処理などを行う
-    fun positionThread(){
+    private fun positionThread(){
+
+        Bukkit.getLogger().info("StartPositionThread")
 
         val threadDB = MySQLManager(plugin,"positionThread")
 
@@ -360,24 +368,31 @@ object Forex {
 
                 Thread.sleep(1000)
 
-                val rs = threadDB.query("select uuid from position_table where `exit`=0 group by uuid;")?:continue
+                val rs = threadDB.query("select uuid from position_table where `exit`=0 group by uuid;")
+
+                if (rs==null){
+                    Bukkit.getLogger().info("NullError")
+                    continue
+                }
 
                 while (rs.next()){
 
                     val uuid = UUID.fromString(rs.getString("uuid"))
-                    var list = getUserPositions(uuid)
+                    val list = getUserPositions(uuid).toMutableList()
                     if (list.isEmpty())continue
 
-                    //強制ロスカット、SL TPなど
+                    //SL TPなど
                     for (p in list){
-
                         checkTouchTPSL(p)
-
-                        if (isLossCutLine(uuid,list)){
-                            exit(p,true)
-                            list = getUserPositions(uuid)
-                        }
                     }
+
+                    while (isLossCutLine(uuid,list)){
+                        if (list.isEmpty())continue
+                        val p = list[0]
+                        exit(p,true)
+                        list.removeAt(0)
+                    }
+
 
                 }
 

@@ -22,6 +22,10 @@ object HighLowGame {
 
     var isEnableGame = true
 
+    init {
+        Thread{ highLowThread() }.start()
+    }
+
     fun loadConfig(){
         Man10Forex.plugin.reloadConfig()
 
