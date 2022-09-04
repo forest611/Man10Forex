@@ -393,7 +393,6 @@ object Forex {
                         list.removeAt(0)
                     }
 
-
                 }
 
                 rs.close()
