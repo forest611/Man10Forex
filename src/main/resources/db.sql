@@ -33,3 +33,31 @@ create table if not exists position_table
 create index position_table_exit_uuid_index
     on man10_binary.position_table (`exit`, uuid);
 
+create table fx_bank
+(
+	id int auto_increment,
+	player varchar(16) not null,
+	uuid varchar(36) not null,
+	balance double default 0.0 not null,
+	constraint user_bank_pk
+		primary key (id)
+);
+
+create index fx_bank_id_uuid_player_index
+	on fx_bank (id, uuid, player);
+
+create table bank_log
+(
+	id int auto_increment,
+	player varchar(16) not null,
+	uuid varchar(36) not null,
+	plugin_name varchar(16) null,
+	amount double default 0 not null,
+	note varchar(64) null,
+	display_note varchar(64) null,
+	server varchar(16) null,
+	deposit boolean default true null,
+	date datetime default now() not null,
+	constraint money_log_pk
+		primary key (id)
+);

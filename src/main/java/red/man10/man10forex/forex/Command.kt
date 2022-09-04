@@ -1,9 +1,8 @@
 package red.man10.man10forex.forex
 
-import net.kyori.adventure.text.Component
+import net.kyori.adventure.text.Component.text
 import net.kyori.adventure.text.event.ClickEvent
 import net.kyori.adventure.text.event.HoverEvent
-import net.kyori.adventure.text.event.HoverEventSource
 import org.bukkit.command.Command
 import org.bukkit.command.CommandExecutor
 import org.bukkit.command.CommandSender
@@ -23,7 +22,6 @@ import red.man10.man10forex.forex.Forex.prefix
 import red.man10.man10forex.forex.Forex.profit
 import red.man10.man10forex.forex.Forex.setSL
 import red.man10.man10forex.forex.Forex.setTP
-import java.lang.Exception
 import java.util.*
 
 object Command :CommandExecutor{
@@ -42,7 +40,7 @@ object Command :CommandExecutor{
 
                 val list = getUserPositions(uuid)
 
-                val bank = bank.getBalance(uuid)
+                val balance = ForexBank.getBalance(uuid)
                 val margin = margin(uuid,list)
                 val require = marginRequirement(list)
                 val percent = if (require==0.0) 0.0 else margin/require*100.0
@@ -51,11 +49,23 @@ object Command :CommandExecutor{
                 val profitColor = if (allProfit<0) "§4§l" else if (allProfit>0) "§b§l" else "§f§l"
                 val percentColor =  if (percent==0.0) "§f§l" else if (percent< lossCutPercent*1.5) "§4§l" else if (percent< lossCutPercent*2.0) "§6§l"  else "§f§l"
 
-                val percentMsg = Component.text("${prefix}${percentColor}維持率:${String.format("%,.3f", percent)}%")
-                    .hoverEvent(HoverEvent.showText(Component.text("§c§l維持率が20.0%を下回ると、ポジションが強制的にイグジットされます")))
+                val percentMsg = text("${prefix}${percentColor}維持率:${String.format("%,.3f", percent)}%")
+                    .hoverEvent(HoverEvent.showText(text("§c§l維持率が20.0%を下回ると、ポジションが強制的にイグジットされます")))
+
+                val balanceMsg = text("${prefix}残高:${String.format("%,.0f", balance)}               ")
+                    .hoverEvent(HoverEvent.showText(text("§f§nFXの口座は、銀行口座と別のものを使用します")))
+
+                val depositButton = text("§a§n[入金]")
+                    .clickEvent(ClickEvent.suggestCommand("/mfx d "))
+                    .hoverEvent(HoverEvent.showText(text("§f銀行のお金を、FX口座に入金します")))
+
+                val withdrawButton = text("  §c§n[出金]")
+                    .clickEvent(ClickEvent.suggestCommand("/mfx w "))
+                    .hoverEvent(HoverEvent.showText(text("§fFX口座から、銀行に出金します\n§c§lポジションを持っているときは、出金できません")))
+
 
                 sender.sendMessage("${prefix}§e§l=============[Man10Trader(MT10)]=============")
-                sender.sendMessage("${prefix}銀行残高:${String.format("%,.0f", bank)}")
+                sender.sendMessage(balanceMsg.append(depositButton).append(withdrawButton))
                 sender.sendMessage("${prefix}有効金額:${String.format("%,.0f", margin)}")
                 sender.sendMessage("${prefix}${profitColor}評価額:${String.format("%,.0f", allProfit)}")
                 sender.sendMessage(percentMsg)
@@ -75,32 +85,32 @@ object Command :CommandExecutor{
                             "§7ロット数:§l${it.lots}\n" +
                             "§7オープン価格:§l${String.format("%,.3f", it.entryPrice)}"
 
-                    val msg = Component.text(prefix+lots+openPrice+profitText+diff)
+                    val msg = text(prefix+lots+openPrice+profitText+diff)
                         .clickEvent(ClickEvent.runCommand("/mfx exit ${it.positionID}"))
-                        .hoverEvent(HoverEvent.showText(Component.text(positionDataText)))
+                        .hoverEvent(HoverEvent.showText(text(positionDataText)))
 
                     val showTP = " §a§n[TP${if (it.tp!=0.0) "(${String.format("%,.3f", it.tp)})" else ""}]"
                     val showSL = " §c§n[SL${if (it.sl!=0.0) "(${String.format("%,.3f", it.sl)})" else ""}]"
 
-                    val compTP = Component.text(showTP)
+                    val compTP = text(showTP)
                         .clickEvent(ClickEvent.suggestCommand("/mfx tp ${it.positionID} "))
-                        .hoverEvent(HoverEvent.showText(Component.text("§a自動で利益を確定する価格を設定します")))
-                    val compSL = Component.text(showSL)
+                        .hoverEvent(HoverEvent.showText(text("§a自動で利益を確定する価格を設定します")))
+                    val compSL = text(showSL)
                         .clickEvent(ClickEvent.suggestCommand("/mfx sl ${it.positionID} "))
-                        .hoverEvent(HoverEvent.showText(Component.text("§c自動で損失を確定する価格を設定します")))
+                        .hoverEvent(HoverEvent.showText(text("§c自動で損失を確定する価格を設定します")))
 
                     sender.sendMessage(msg.append(compTP).append(compSL))
 
                 }
 
-                val prefix = Component.text(prefix)
-                val sellButton = Component.text("§c§l§n[売る]")
+                val prefix = text(prefix)
+                val sellButton = text("§c§l§n[売る]")
                     .clickEvent(ClickEvent.suggestCommand("/mfx sell "))
-                    .hoverEvent(HoverEvent.showText(Component.text("§c現在価格より下回ったら利益がでます\n§c/mfx sell <ロット数>(0.01〜1000)")))
-                val space = Component.text("    ")
-                val buyButton = Component.text("§a§l§n[買う]")
+                    .hoverEvent(HoverEvent.showText(text("§c現在価格より下回ったら利益がでます\n§c/mfx sell <ロット数>(0.01〜1000)")))
+                val space = text("    ")
+                val buyButton = text("§a§l§n[買う]")
                     .clickEvent(ClickEvent.suggestCommand("/mfx buy "))
-                    .hoverEvent(HoverEvent.showText(Component.text("§a現在価格より上回ったら利益がでます\n§a/mfx buy <ロット数>(0.01〜1000)")))
+                    .hoverEvent(HoverEvent.showText(text("§a現在価格より上回ったら利益がでます\n§a/mfx buy <ロット数>(0.01〜1000)")))
 
 
                 sender.sendMessage(prefix.append(sellButton).append(space).append(buyButton))
@@ -223,6 +233,59 @@ object Command :CommandExecutor{
 
                 Thread{ Forex.exit(sender,posId) }.start()
                 return true
+            }
+
+            "d" ->{
+
+                Thread{
+
+                    val uuid = sender.uniqueId
+                    val amount = if (args[1] == "all") bank.getBalance(uuid) else args[1].toDoubleOrNull()
+
+                    if (amount == null || amount < 1.0 ){
+                        sender.sendMessage("${prefix}数字で入力してください")
+                        return@Thread
+                    }
+
+                    if (bank.withdraw(uuid,amount,"Bank->FX","銀行からFX口座へ")){
+                        if (ForexBank.deposit(uuid,amount,"FromBank","銀行から入金")){
+                            sender.sendMessage("${prefix}銀行からFX口座に入金されました")
+                        }
+                        return@Thread
+                    }
+
+                    sender.sendMessage("${prefix}銀行の残高が足りません")
+
+                }.start()
+
+                return true
+            }
+
+            "w" ->{
+
+                Thread{
+
+                    val uuid = sender.uniqueId
+                    val amount = if (args[1] == "all") ForexBank.getBalance(uuid) else args[1].toDoubleOrNull()
+
+                    if (amount == null || amount < 1.0 ){
+                        sender.sendMessage("${prefix}数字で1以上を入力してください")
+                        return@Thread
+                    }
+
+                    if (getUserPositions(uuid).isNotEmpty()){
+                        sender.sendMessage("${prefix}ポジションを持っているときは、出金できません！")
+                        return@Thread
+                    }
+
+                    if (ForexBank.withdraw(uuid,amount,"ToBank","銀行へ出金")){
+                        bank.deposit(uuid,amount, "FX->Bank","FX口座から銀行へ")
+                    }
+
+                }.start()
+
+                return true
+
             }
 
             "reload" ->{

@@ -2,7 +2,6 @@ package red.man10.man10forex.forex
 
 import org.bukkit.Bukkit
 import org.bukkit.entity.Player
-import red.man10.man10forex.Man10Forex.Companion.bank
 import red.man10.man10forex.Man10Forex.Companion.plugin
 import red.man10.man10forex.util.MySQLManager
 import red.man10.man10forex.util.Price
@@ -206,7 +205,7 @@ object Forex {
         return true
     }
 
-    private fun exit(position: Position,isLossCut:Boolean,exitPrice: Double? = null){
+    private fun exit(position: Position,isLossCut:Boolean,exitPrice: Double? = null):Double{
 
         val price = exitPrice ?: if (position.buy) Price.bid() else Price.ask()
         val profit = profit(position)
@@ -214,18 +213,21 @@ object Forex {
         if (profit>0){
             val msg = if (isLossCut) "強制ロスカット" else "FX利益"
 
-            bank.deposit(position.uuid,profit, "ForexProfit",msg)
+            ForexBank.deposit(position.uuid,profit, "ForexProfit",msg)
         }
 
         if (profit<0){
             val msg = if (isLossCut) "強制ロスカット" else "FXの損失"
 
-            if (!bank.withdraw(position.uuid,-profit, "ForexLoss",msg)){
-                bank.withdraw(position.uuid, bank.getBalance(position.uuid),"ForexZeroCut","FXゼロカット")
+            if (!ForexBank.withdraw(position.uuid,-profit, "ForexLoss",msg)){
+                //ゼロカット
+                ForexBank.setBalance(position.uuid, ForexBank.getBalance(position.uuid))
             }
         }
 
         closePosition(position.positionID,price,profit)
+
+        return profit
     }
 
     //手動Exit
@@ -235,8 +237,8 @@ object Forex {
 
         list.forEach {
             if (it.positionID == pos){
-                exit(it,false)
-                p.sendMessage("${prefix}ポジションをイグジットしました！(利益の確認は/ballog)")
+                val profit = exit(it,false)
+                p.sendMessage("${prefix}ポジションをイグジットしました！(損益:${String.format("%,.0f", profit)})")
                 return@forEach
             }
         }
@@ -296,7 +298,7 @@ object Forex {
 
     //有効証拠金
     fun margin(uuid: UUID,list: List<Position>):Double{
-        return bank.getBalance(uuid) + allProfit(list)
+        return ForexBank.getBalance(uuid) + allProfit(list)
     }
 
     //ロスカットラインに入っているか

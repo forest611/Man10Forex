@@ -3,6 +3,7 @@ package red.man10.man10forex
 import org.bukkit.plugin.java.JavaPlugin
 import red.man10.man10bank.BankAPI
 import red.man10.man10forex.forex.Forex
+import red.man10.man10forex.forex.ForexBank
 import red.man10.man10forex.highlow.Command
 import red.man10.man10forex.highlow.HighLowGame
 import red.man10.man10forex.util.MenuFramework
@@ -34,6 +35,7 @@ class Man10Forex : JavaPlugin() {
         server.getPluginCommand("mfx")!!.setExecutor(red.man10.man10forex.forex.Command)
 
         server.pluginManager.registerEvents(MenuFramework.MenuListener,this)
+        server.pluginManager.registerEvents(ForexBank,this)
         MySQLManager.runAsyncMySQLQueue(plugin,"Man10Forex")
 
         Thread{ HighLowGame.highLowThread() }.start()
