@@ -34,17 +34,21 @@ object Forex {
         maxLot = plugin.config.getDouble("MaxLot")
         lossCutPercent = plugin.config.getDouble("LossCutPercent")
         spread = pipsToPrice(plugin.config.getDouble("SpreadPips"))
+        unitSize = plugin.config.getInt("UnitSize")
+
     }
+
 
     @Synchronized
     private fun closePosition(id: UUID,price: Double,profit:Double){
         mysql.execute("UPDATE position_table SET `exit` = 1, exit_price = ${price}, profit = ${profit}, exit_date = now() WHERE position_id = '${id}';")
     }
 
+    @Synchronized
     private fun createPosition(position: Position){
         val p = Bukkit.getOfflinePlayer(position.uuid).name
 
-        MySQLManager.mysqlQueue.add("INSERT INTO position_table (position_id, player, uuid, lots, buy, sell, `exit`, entry_price, exit_price, profit, entry_date, exit_date) " +
+        mysql.execute("INSERT INTO position_table (position_id, player, uuid, lots, buy, sell, `exit`, entry_price, exit_price, profit, entry_date, exit_date) " +
                 "VALUES ('" +
                 "${position.positionID}', " +
                 "'${p}', " +
@@ -131,7 +135,7 @@ object Forex {
         MySQLManager.mysqlQueue.add("UPDATE position_table SET sl_price = ${position!!.sl} WHERE position_id ='${pos}'")
     }
 
-    fun checkTouchTPSL(position: Position){
+    private fun checkTouchTPSL(position: Position){
 
         if (position.buy){
             val bid = Price.bid()
@@ -162,7 +166,12 @@ object Forex {
     @Synchronized
     fun getUserPositions(uuid:UUID):List<Position>{
 
-        val rs = mysql.query("select * from position_table where uuid='${uuid}' and `exit`=0;")?:return Collections.emptyList()
+        val rs = mysql.query("select * from position_table where uuid='${uuid}' and `exit`=0;")
+
+        if (rs == null){
+            Bukkit.getLogger().info("ERROR: Cant get Positions")
+            return emptyList()
+        }
 
         val list = mutableListOf<Position>()
 
@@ -310,9 +319,9 @@ object Forex {
     }
 
     //ロスカットラインに入っているか
-    fun isLossCutLine(uuid: UUID,list:List<Position>):Boolean{
+    private fun isLossCutLine(uuid: UUID,list:List<Position>):Boolean{
 
-        if (list.isEmpty())return true
+        if (list.isEmpty())return false
 
         val p = Bukkit.getOfflinePlayer(uuid)
 
@@ -321,7 +330,8 @@ object Forex {
         //必要証拠金
         val require = marginRequirement(list)
         //証拠金維持率
-        val percent = if (require==0.0) 0.0 else margin/require*100.0
+        val percent = if (require==0.0) return false else margin/require*100.0
+
         if (percent< lossCutPercent){
 
             if (p.isOnline){
@@ -367,45 +377,44 @@ object Forex {
 
         val threadDB = MySQLManager(plugin,"positionThread")
 
-        while (true){
-            try {
+        mainLoop@while (true){
 
-                Thread.sleep(1000)
+            Thread.sleep(500)
 
-                val rs = threadDB.query("select uuid from position_table where `exit`=0 group by uuid;")
+            val rs = threadDB.query("select uuid from position_table where `exit`=0 group by uuid;")
 
-                if (rs==null){
-                    Bukkit.getLogger().info("NullError")
-                    continue
-                }
-
-                while (rs.next()){
-
-                    val uuid = UUID.fromString(rs.getString("uuid"))
-                    val list = getUserPositions(uuid).toMutableList()
-                    if (list.isEmpty())continue
-
-                    //SL TPなど
-                    for (p in list){
-                        checkTouchTPSL(p)
-                    }
-
-                    while (isLossCutLine(uuid,list)){
-                        if (list.isEmpty())continue
-                        val p = list[0]
-                        exit(p,true)
-                        list.removeAt(0)
-                    }
-
-                }
-
-                rs.close()
-                mysql.close()
-
-            }catch (e:Exception){
-                Bukkit.getLogger().info(e.message)
+            if (rs==null){
+                Bukkit.getLogger().info("NullError")
+                break@mainLoop
             }
+
+            while (rs.next()){
+
+                val uuid = UUID.fromString(rs.getString("uuid"))
+                val list = getUserPositions(uuid).toMutableList()
+
+                //SL TPなど
+                for (p in list){
+                    checkTouchTPSL(p)
+                }
+
+                lossCut@while (isLossCutLine(uuid,list)){
+                    if (list.isEmpty()){
+                        break@lossCut
+                    }
+                    val p = list[0]
+                    exit(p,true)
+                    list.removeAt(0)
+
+                }
+            }
+
+            rs.close()
+            mysql.close()
         }
+
+        Bukkit.getLogger().info("FinishPositionThread")
+        isEnable = false
     }
 
 

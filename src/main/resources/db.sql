@@ -31,7 +31,7 @@ create table if not exists position_table
 );
 
 create index position_table_exit_uuid_index
-    on man10_binary.position_table (`exit`, uuid);
+    on position_table (`exit`, uuid);
 
 create table fx_bank
 (
