@@ -6,7 +6,7 @@ import red.man10.man10forex.Man10Forex.Companion.plugin
 import red.man10.man10forex.util.MySQLManager
 import red.man10.man10forex.util.Price
 import java.util.*
-import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.LinkedBlockingQueue
 
 object Forex {
 
@@ -21,10 +21,13 @@ object Forex {
 
     var isEnable = true
 
-    private val mysql:MySQLManager = MySQLManager(plugin,"Man10Forex")
+    private val queueMysql:MySQLManager = MySQLManager(plugin,"Man10Forex")
+    private val positionMysql:MySQLManager = MySQLManager(plugin,"Man10Forex")
+    private val jobQueue = LinkedBlockingQueue<Job>()
 
     init {
         Thread{ positionThread() }.start()
+        Thread{ queueThread() }.start()
     }
 
     fun loadConfig(){
@@ -39,17 +42,15 @@ object Forex {
 
     }
 
-
-    @Synchronized
     private fun closePosition(id: UUID,price: Double,profit:Double){
-        mysql.execute("UPDATE position_table SET `exit` = 1, exit_price = ${price}, profit = ${profit}, exit_date = now() WHERE position_id = '${id}';")
+        queueMysql.execute("UPDATE position_table SET `exit` = 1, exit_price = ${price}, profit = ${profit}, exit_date = now() WHERE position_id = '${id}';")
     }
 
-    @Synchronized
+
     private fun createPosition(position: Position){
         val p = Bukkit.getOfflinePlayer(position.uuid).name
 
-        mysql.execute("INSERT INTO position_table (position_id, player, uuid, lots, buy, sell, `exit`, entry_price, exit_price, profit, entry_date, exit_date) " +
+        queueMysql.execute("INSERT INTO position_table (position_id, player, uuid, lots, buy, sell, `exit`, entry_price, exit_price, profit, entry_date, exit_date) " +
                 "VALUES ('" +
                 "${position.positionID}', " +
                 "'${p}', " +
@@ -138,34 +139,37 @@ object Forex {
 
     private fun checkTouchTPSL(uuid: UUID){
 
-        val list = getUserPositions(uuid)
+        val job = Job{
+            val list = getUserPositions(uuid)
 
-        list.forEach {
-            if (it.buy){
-                val bid = Price.bid()
+            list.forEach {
+                if (it.buy){
+                    val bid = Price.bid()
 
-                if (it.tp!= 0.0 && bid>it.tp){
-                    exit(it,false,it.tp)
+                    if (it.tp!= 0.0 && bid>it.tp){
+                        exit(it,false,it.tp)
+                    }
+
+                    if (it.sl!= 0.0 && bid<it.sl){
+                        exit(it,false,it.sl)
+                    }
                 }
 
-                if (it.sl!= 0.0 && bid<it.sl){
-                    exit(it,false,it.sl)
+                if (it.sell){
+                    val ask = Price.ask()
+
+                    if (it.tp!= 0.0 && ask<it.tp){
+                        exit(it,false,it.tp)
+                    }
+
+                    if (it.sl!= 0.0 && ask>it.sl){
+                        exit(it,false,it.sl)
+                    }
                 }
             }
-
-            if (it.sell){
-                val ask = Price.ask()
-
-                if (it.tp!= 0.0 && ask<it.tp){
-                    exit(it,false,it.tp)
-                }
-
-                if (it.sl!= 0.0 && ask>it.sl){
-                    exit(it,false,it.sl)
-                }
-            }
-
         }
+
+        jobQueue.add(job)
     }
 
     @Synchronized
@@ -173,13 +177,12 @@ object Forex {
 
         val list = mutableListOf<Position>()
 
-        val rs = mysql.query("select * from position_table where uuid='${uuid}' and `exit`=0;")
+        val rs = positionMysql.query("select * from position_table where uuid='${uuid}' and `exit`=0;")
 
         if (rs == null){
             Bukkit.getLogger().info("ERROR: Cant get Positions")
             return  list
         }
-
 
         while (rs.next()){
             val p = Position(
@@ -197,35 +200,40 @@ object Forex {
         }
 
         rs.close()
-        mysql.close()
+        positionMysql.close()
 
         return list
     }
 
 
-    fun entry(p:Player,lots: Double,isBuy:Boolean):Boolean{
+    fun entry(p:Player,lots: Double,isBuy:Boolean){
 
-        val id = UUID.randomUUID()
-        val price = if (isBuy) Price.ask() else Price.bid()
+        val job = Job {
+            val id = UUID.randomUUID()
+            val price = if (isBuy) Price.ask() else Price.bid()
 
-        val maxLots = maxLots(p.uniqueId,price)
-        //ロット数が証拠金より多い場合
-        if (lots> maxLots){
-            if (lots< minLot){
-                p.sendMessage("${prefix}残高があまりにも少ないため、エントリーができません")
-                return false
+            val maxLots = maxLots(p.uniqueId,price)
+            //ロット数が証拠金より多い場合
+            if (lots> maxLots){
+                if (lots< minLot){
+                    p.sendMessage("${prefix}残高があまりにも少ないため、エントリーができません")
+                    return@Job
+                }
+                p.sendMessage("${prefix}あなたがエントリーできる最大ロット数は${String.format("%,.2f", maxLots)}までです！")
+                return@Job
             }
-            p.sendMessage("${prefix}あなたがエントリーできる最大ロット数は${String.format("%,.2f", maxLots)}までです！")
-            return false
+
+            val position = Position(id,p.uniqueId,lots,price,isBuy,!isBuy,0.0,0.0)
+
+            createPosition(position)
+
+            p.sendMessage("${prefix}エントリーを受け付けました！価格:§d§l${String.format("%,.3f", price)}")
+
         }
 
-        val position = Position(id,p.uniqueId,lots,price,isBuy,!isBuy,0.0,0.0)
+        jobQueue.add(job)
 
-        createPosition(position)
-
-        p.sendMessage("${prefix}エントリーを受け付けました！価格:§d§l${String.format("%,.3f", price)}")
-
-        return true
+        return
     }
 
     private fun exit(position: Position,isLossCut:Boolean,exitPrice: Double? = null):Double{
@@ -233,22 +241,27 @@ object Forex {
         val price = exitPrice ?: if (position.buy) Price.bid() else Price.ask()
         val profit = profit(position)
 
-        if (profit>0){
-            val msg = if (isLossCut) "強制ロスカット" else "FX利益"
+        val job = Job {
 
-            ForexBank.deposit(position.uuid,profit, "ForexProfit",msg)
-        }
+            if (profit>0){
+                val msg = if (isLossCut) "強制ロスカット" else "FX利益"
 
-        if (profit<0){
-            val msg = if (isLossCut) "強制ロスカット" else "FXの損失"
-
-            if (!ForexBank.withdraw(position.uuid,-profit, "ForexLoss",msg)){
-                //ゼロカット
-                ForexBank.setBalance(position.uuid, 0.0)
+                ForexBank.deposit(position.uuid,profit, "ForexProfit",msg)
             }
+
+            if (profit<0){
+                val msg = if (isLossCut) "強制ロスカット" else "FXの損失"
+
+                if (!ForexBank.withdraw(position.uuid,-profit, "ForexLoss",msg)){
+                    //ゼロカット
+                    ForexBank.setBalance(position.uuid, 0.0)
+                }
+            }
+
+            closePosition(position.positionID,price,profit)
         }
 
-        closePosition(position.positionID,price,profit)
+        jobQueue.add(job)
 
         return profit
     }
@@ -327,37 +340,42 @@ object Forex {
     //ロスカットラインに入っているか
     private fun checkLossCut(uuid: UUID){
 
-        val p = Bukkit.getOfflinePlayer(uuid)
+        val job = Job{
+            val p = Bukkit.getOfflinePlayer(uuid)
 
-        val list = getUserPositions(uuid)
+            val list = getUserPositions(uuid)
 
-        if (list.isEmpty())return
+            if (list.isEmpty())return@Job
 
-        //有効証拠金
-        var margin = margin(uuid,list)
-        //必要証拠金
-        var require = marginRequirement(list)
-        //証拠金維持率
-        var percent = if (require==0.0) return else margin/require*100.0
+            //有効証拠金
+            var margin = margin(uuid,list)
+            //必要証拠金
+            var require = marginRequirement(list)
+            //証拠金維持率
+            var percent = if (require==0.0) return@Job else margin/require*100.0
 
-        while (percent< lossCutPercent){
+            while (percent< lossCutPercent){
 
-            val exitPos = list.first()
+                val exitPos = list.first()
 
-            exit(exitPos,true)
+                exit(exitPos,true)
 
-            if (p.isOnline){ p.player!!.sendMessage("${prefix}§4§l損失が激しいため強制ロスカットを行いました！") }
-            Bukkit.getLogger().info("LOSS CUT ${percent}%")
+                if (p.isOnline){ p.player!!.sendMessage("${prefix}§4§l損失が激しいため強制ロスカットを行いました！") }
+                Bukkit.getLogger().info("LOSS CUT ${percent}%")
 
-            list.remove(exitPos)
+                list.remove(exitPos)
 
-            if (list.isEmpty())return
+                if (list.isEmpty())return@Job
 
-            margin = margin(uuid,list)
-            require = marginRequirement(list)
-            percent = if (require==0.0) return else margin/require*100.0
+                margin = margin(uuid,list)
+                require = marginRequirement(list)
+                percent = if (require==0.0) return@Job else margin/require*100.0
 
+            }
         }
+
+        jobQueue.add(job)
+
     }
 
     private fun maxLots(uuid: UUID, price: Double):Double{
@@ -368,10 +386,6 @@ object Forex {
 
     private fun lotsToMan10Money(lots:Double, price: Double):Double{
         return price*lots* unitSize
-    }
-
-    fun man10MoneyToLots(money:Double,price: Double):Double{
-        return money/price/ unitSize
     }
 
     //ドル円のみ対応
@@ -405,13 +419,32 @@ object Forex {
             }
 
             rs.close()
-            mysql.close()
+            queueMysql.close()
 
             Thread.sleep(1000)
         }
 
         Bukkit.getLogger().info("FinishPositionThread")
         isEnable = false
+    }
+
+    private fun queueThread(){
+
+        Bukkit.getLogger().info("QueueThread")
+
+        while (true){
+            try {
+                val job = jobQueue.take()
+//                Bukkit.getLogger().info("TakeQueue")
+                job.job()
+            }catch (e:Exception){
+                Bukkit.getLogger().info(e.message)
+            }
+        }
+    }
+
+    private fun interface Job{
+        fun job()
     }
 
 
