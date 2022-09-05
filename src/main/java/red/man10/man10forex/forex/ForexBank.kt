@@ -142,7 +142,7 @@ object ForexBank :Listener{
      */
     private fun depositQueue(uuid: UUID, amount: Double, plugin: String, note:String,displayNote:String?):Int{
 
-        if (!Forex.isEnable){ return 1 }
+        if (!Forex.MarketStatus.deposit){ return 1 }
 
         val finalAmount = kotlin.math.floor(amount)
 
@@ -168,7 +168,7 @@ object ForexBank :Listener{
 
         val p = Bukkit.getOfflinePlayer(uuid)
 
-        if (!Forex.isEnable){
+        if (!Forex.MarketStatus.withdraw){
             Bukkit.getLogger().warning("[出金エラー]Man10Bankが閉じています ユーザー:${p.name}")
             return 1
         }

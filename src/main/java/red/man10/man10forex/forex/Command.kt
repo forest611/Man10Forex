@@ -15,7 +15,6 @@ import red.man10.man10forex.Man10Forex.Companion.bank
 import red.man10.man10forex.Man10Forex.Companion.plugin
 import red.man10.man10forex.forex.Forex.allProfit
 import red.man10.man10forex.forex.Forex.asyncGetUserPositions
-import red.man10.man10forex.forex.Forex.isEnable
 import red.man10.man10forex.forex.Forex.lossCutPercent
 import red.man10.man10forex.forex.Forex.margin
 import red.man10.man10forex.forex.Forex.marginRequirement
@@ -58,8 +57,8 @@ object Command :CommandExecutor{
 
                 if (!sender.hasPermission(FOREX_USER)){ return true }
 
-                if (!isEnable){
-                    sender.sendMessage("${prefix}現在取引所がクローズしております")
+                if (!Forex.MarketStatus.entry){
+                    sender.sendMessage("${prefix}現在エントリーできません")
                     return true
                 }
 
@@ -153,6 +152,12 @@ object Command :CommandExecutor{
             }
 
             "exit" ->{
+
+                if (!Forex.MarketStatus.exit){
+                    sender.sendMessage("${prefix}現在手動イグジットはできません")
+                    return true
+                }
+
                 if (args.size!=2){
                     sender.sendMessage("${prefix}イグジット失敗！、正しくイグジットできていない可能性があります！")
                     return true
@@ -166,6 +171,11 @@ object Command :CommandExecutor{
             }
 
             "d" ->{
+
+                if (!Forex.MarketStatus.deposit){
+                    sender.sendMessage("${prefix}現在FX口座への入金はできません")
+                    return true
+                }
 
                 val uuid = sender.uniqueId
                 val amount = if (args[1] == "all") bank.getBalance(uuid) else args[1].toDoubleOrNull()
@@ -191,6 +201,11 @@ object Command :CommandExecutor{
             }
 
             "w" ->{
+
+                if (!Forex.MarketStatus.withdraw){
+                    sender.sendMessage("${prefix}現在FX口座から出金はできません")
+                    return true
+                }
 
                 val uuid = sender.uniqueId
                 val amount = if (args[1] == "all") ForexBank.getBalance(uuid) else args[1].toDoubleOrNull()
@@ -236,20 +251,39 @@ object Command :CommandExecutor{
 
                 if (!sender.hasPermission(OP)){ return true }
                 Forex.loadConfig()
-                Bukkit.getLogger().info("RELOAD")
+                sender.sendMessage("Reload")
             }
 
-            "on" ->{
-                if (!sender.hasPermission(OP)){ return true }
-                isEnable = true
-                Bukkit.getLogger().info("ENABLED")
+            "status" ->{
+
+                if (args.size==3){
+
+                    when(args[1]){
+
+                        "entry" ->Forex.MarketStatus.entry = args[2].toBoolean()
+                        "exit" ->Forex.MarketStatus.exit = args[2].toBoolean()
+                        "deposit" ->Forex.MarketStatus.deposit = args[2].toBoolean()
+                        "withdraw" ->Forex.MarketStatus.withdraw = args[2].toBoolean()
+
+                        "all" ->{
+                            val bool = args[2].toBoolean()
+                            Forex.MarketStatus.entry = bool
+                            Forex.MarketStatus.exit = bool
+                            Forex.MarketStatus.deposit = bool
+                            Forex.MarketStatus.withdraw = bool
+                        }
+
+                        else ->{}
+                    }
+
+                }
+                sender.sendMessage("${prefix}entry:${Forex.MarketStatus.entry}")
+                sender.sendMessage("${prefix}exit:${Forex.MarketStatus.exit}")
+                sender.sendMessage("${prefix}deposit:${Forex.MarketStatus.deposit}")
+                sender.sendMessage("${prefix}withdraw:${Forex.MarketStatus.withdraw}")
+
             }
 
-            "off" ->{
-                if (!sender.hasPermission(OP)){ return true }
-                isEnable = false
-                Bukkit.getLogger().info("DISABLED")
-            }
         }
 
         return true

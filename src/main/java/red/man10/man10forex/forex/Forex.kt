@@ -22,8 +22,6 @@ object Forex {
     var unitSize : Int = 100000
     var spread : Double = 0.02  //スプレッド(Price)
 
-    var isEnable = true
-
     private val jobQueue = LinkedBlockingQueue<Job>()
 
     init {
@@ -159,11 +157,7 @@ object Forex {
     }
 
     fun exit(uuid: UUID,pos:UUID,isLossCut:Boolean,exitPrice: Double? = null){
-
-        val job = Job {sql->
-            asyncExit(uuid, pos, isLossCut, sql, exitPrice)
-        }
-        jobQueue.add(job)
+        jobQueue.add(Job {asyncExit(uuid, pos, isLossCut, it, exitPrice) })
     }
 
     fun setTP(p:Player,pos:UUID,tp: Double){
@@ -240,7 +234,7 @@ object Forex {
 
             if (position!!.sell){
                 val ask = Price.ask()
-                position!!.tp = if (ask>sl){ 0.0 } else sl
+                position!!.sl = if (ask>sl){ 0.0 } else sl
 
                 if (position!!.sl == 0.0){
                     p.sendMessage("${prefix}SLは現在価格(${Utility.priceFormat(ask)})より高く設定してください")
@@ -275,7 +269,7 @@ object Forex {
     }
 
 
-    //差額(Pips
+    //ポジションの現在価格との差(Pips)
     fun diffPips(position: Position):Double{
         if (position.buy){
             val bid = Price.bid()
@@ -394,7 +388,7 @@ object Forex {
     }
 
     private fun lotsToMan10Money(lots:Double, price: Double):Double{
-        return price*lots* unitSize
+        return floor(price*lots* unitSize)
     }
 
     //ドル円のみ対応
@@ -440,7 +434,6 @@ object Forex {
         }
 
         Bukkit.getLogger().info("FinishPositionThread")
-        isEnable = false
     }
 
     //ポジションを管理するスレッド
@@ -474,5 +467,12 @@ object Forex {
         var sl:Double,
         var tp:Double
     )
+
+    object MarketStatus{
+        var entry = true
+        var exit = true
+        var deposit = true
+        var withdraw = true
+    }
 
 }
