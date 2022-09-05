@@ -311,16 +311,30 @@ object Forex {
         val job = Job{sql ->
             val p = Bukkit.getOfflinePlayer(uuid)
 
+            Bukkit.getLogger().info("1")
+
             var list = asyncGetUserPositions(uuid,sql)
+
+            Bukkit.getLogger().info("2")
 
             if (list.isEmpty())return@Job
 
+            Bukkit.getLogger().info("3")
+
             //有効証拠金
             var margin = margin(uuid,list)
+
+            Bukkit.getLogger().info("4")
+
             //必要証拠金
             var require = marginRequirement(list)
+
+            Bukkit.getLogger().info("5")
+
             //証拠金維持率
             var percent = if (require==0.0) return@Job else margin/require*100.0
+
+            Bukkit.getLogger().info("6")
 
             while (percent< lossCutPercent){
 
@@ -340,6 +354,9 @@ object Forex {
                 require = marginRequirement(list)
                 percent = if (require==0.0) return@Job else margin/require*100.0
             }
+
+            Bukkit.getLogger().info("7")
+
         }
 
         jobQueue.add(job)
