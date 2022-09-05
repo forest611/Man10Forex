@@ -185,23 +185,23 @@ object Forex {
                 val bid = Price.bid()
                 //tpが現在値より低い時は未設定に
                 position!!.tp = if (bid>tp){ 0.0 } else tp
+
+                if (position!!.tp == 0.0){
+                    p.sendMessage("${prefix}TPは現在価格(${Utility.priceFormat(bid)})より高く設定してください")
+                }else{
+                    p.sendMessage("${prefix}設定完了")
+                }
             }
 
             if (position!!.sell){
                 val ask = Price.ask()
                 position!!.tp = if (ask<tp){ 0.0 } else tp
-            }
 
-            if (position!!.tp == 0.0){
-
-                if (position!!.buy){
-                    p.sendMessage("${prefix}TPは現在価格より高く設定してください")
+                if (position!!.tp == 0.0){
+                    p.sendMessage("${prefix}TPは現在価格(${Utility.priceFormat(ask)})より低く設定してください")
                 }else{
-                    p.sendMessage("${prefix}TPは現在価格より低く設定してください")
+                    p.sendMessage("${prefix}設定完了")
                 }
-
-            }else{
-                p.sendMessage("${prefix}設定完了")
             }
 
             sql.execute("UPDATE position_table SET tp_price = ${position!!.tp} WHERE position_id ='${pos}'")
@@ -230,21 +230,23 @@ object Forex {
                 val bid = Price.bid()
                 //slが現在値より高い時は未設定に
                 position!!.sl = if (bid<sl){ 0.0 } else sl
+
+                if (position!!.sl == 0.0){
+                    p.sendMessage("${prefix}SLは現在価格(${Utility.priceFormat(bid)})より低く設定してください")
+                }else{
+                    p.sendMessage("${prefix}設定完了")
+                }
             }
 
             if (position!!.sell){
                 val ask = Price.ask()
                 position!!.tp = if (ask>sl){ 0.0 } else sl
-            }
 
-            if (position!!.sl == 0.0){
-                if (position!!.buy){
-                    p.sendMessage("${prefix}SLは現在価格より低く設定してください")
+                if (position!!.sl == 0.0){
+                    p.sendMessage("${prefix}SLは現在価格(${Utility.priceFormat(ask)})より高く設定してください")
                 }else{
-                    p.sendMessage("${prefix}SLは現在価格より高く設定してください")
+                    p.sendMessage("${prefix}設定完了")
                 }
-            }else{
-                p.sendMessage("${prefix}設定完了")
             }
 
             sql.execute("UPDATE position_table SET sl_price = ${position!!.sl} WHERE position_id ='${pos}'")
