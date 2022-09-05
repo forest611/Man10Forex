@@ -3,10 +3,13 @@ package red.man10.man10forex.forex
 import org.bukkit.Bukkit
 import org.bukkit.entity.Player
 import red.man10.man10forex.Man10Forex.Companion.plugin
+import red.man10.man10forex.forex.Forex.Job
 import red.man10.man10forex.util.MySQLManager
 import red.man10.man10forex.util.Price
+import red.man10.man10forex.util.Utility
 import java.util.*
 import java.util.concurrent.LinkedBlockingQueue
+import kotlin.math.floor
 
 object Forex {
 
@@ -21,8 +24,6 @@ object Forex {
 
     var isEnable = true
 
-    private val queueMysql:MySQLManager = MySQLManager(plugin,"Man10Forex")
-    private val positionMysql:MySQLManager = MySQLManager(plugin,"Man10Forex")
     private val jobQueue = LinkedBlockingQueue<Job>()
 
     init {
@@ -42,35 +43,10 @@ object Forex {
 
     }
 
-    private fun closePosition(id: UUID,price: Double,profit:Double){
-        queueMysql.execute("UPDATE position_table SET `exit` = 1, exit_price = ${price}, profit = ${profit}, exit_date = now() WHERE position_id = '${id}';")
-    }
+    private fun asyncExit(uuid: UUID, pos:UUID, isLossCut:Boolean, sql: MySQLManager, exitPrice: Double? = null){
 
-
-    private fun createPosition(position: Position){
-        val p = Bukkit.getOfflinePlayer(position.uuid).name
-
-        queueMysql.execute("INSERT INTO position_table (position_id, player, uuid, lots, buy, sell, `exit`, entry_price, exit_price, profit, entry_date, exit_date) " +
-                "VALUES ('" +
-                "${position.positionID}', " +
-                "'${p}', " +
-                "'${position.uuid}', " +
-                "${position.lots}, " +
-                "${if (position.buy) 1 else 0}, " +
-                "${if (position.sell) 1 else 0}, " +
-                "DEFAULT, " +
-                "${position.entryPrice}, " +
-                "null, " +
-                "null, " +
-                "DEFAULT, " +
-                "null);")
-    }
-
-
-    fun setTP(p:Player,pos:UUID,tp: Double){
-
-        val list = getUserPositions(p.uniqueId)
-        var position : Position? = null
+        val list = asyncGetUserPositions(uuid, sql)
+        var position: Position? = null
 
         list.forEach {
             if (it.positionID == pos){
@@ -79,105 +55,38 @@ object Forex {
             }
         }
 
-        if (position == null)return
+        if (position==null)return
 
-        if (position!!.buy){
-            val bid = Price.bid()
-            //tpが現在値より低い時は未設定に
-            position!!.tp = if (bid>tp){ 0.0 } else tp
+        val price = exitPrice ?: if (position!!.buy) Price.bid() else Price.ask()
+        val profit = profit(position!!)
+
+        if (profit>0){
+            val msg = if (isLossCut) "強制ロスカット" else "FX利益"
+            ForexBank.deposit(uuid,profit, "ForexProfit",msg)
         }
 
-        if (position!!.sell){
-            val ask = Price.ask()
-            position!!.tp = if (ask<tp){ 0.0 } else tp
-        }
+        if (profit<0){
+            val msg = if (isLossCut) "強制ロスカット" else "FXの損失"
 
-        if (position!!.tp == 0.0){
-            p.sendMessage("${prefix}TPの価格に問題があります")
-        }else{
-            p.sendMessage("${prefix}設定完了")
-        }
-
-        MySQLManager.mysqlQueue.add("UPDATE position_table SET tp_price = ${position!!.tp} WHERE position_id ='${pos}'")
-    }
-
-
-    fun setSL(p:Player,pos:UUID,sl: Double){
-
-        val list = getUserPositions(p.uniqueId)
-        var position : Position? = null
-
-        list.forEach {
-            if (it.positionID == pos){
-                position = it
-                return@forEach
+            if (!ForexBank.withdraw(uuid,-profit, "ForexLoss",msg)){
+                //ゼロカット
+                ForexBank.setBalance(uuid, 0.0)
             }
         }
 
-        if (position == null)return
+        sql.execute("UPDATE position_table SET `exit` = 1, exit_price = ${price}, profit = ${profit}, exit_date = now() WHERE position_id = '${position!!.positionID}';")
 
-        if (position!!.buy){
-            val bid = Price.bid()
-            //slが現在値より高い時は未設定に
-            position!!.sl = if (bid<sl){ 0.0 } else sl
-        }
+        //オンラインだったらメッセージを送る
+        val p = Bukkit.getOfflinePlayer(uuid).player?:return
+        p.sendMessage("${prefix}ポジションをイグジットしました！(損益:${Utility.moneyFormat(profit)})")
 
-        if (position!!.sell){
-            val ask = Price.ask()
-            position!!.tp = if (ask>sl){ 0.0 } else sl
-        }
-
-        if (position!!.sl == 0.0){
-            p.sendMessage("${prefix}SLの価格に問題があります")
-        }else{
-            p.sendMessage("${prefix}設定完了")
-        }
-
-
-        MySQLManager.mysqlQueue.add("UPDATE position_table SET sl_price = ${position!!.sl} WHERE position_id ='${pos}'")
     }
 
-    private fun checkTouchTPSL(uuid: UUID){
-
-        val job = Job{
-            val list = getUserPositions(uuid)
-
-            list.forEach {
-                if (it.buy){
-                    val bid = Price.bid()
-
-                    if (it.tp!= 0.0 && bid>it.tp){
-                        exit(it,false,it.tp)
-                    }
-
-                    if (it.sl!= 0.0 && bid<it.sl){
-                        exit(it,false,it.sl)
-                    }
-                }
-
-                if (it.sell){
-                    val ask = Price.ask()
-
-                    if (it.tp!= 0.0 && ask<it.tp){
-                        exit(it,false,it.tp)
-                    }
-
-                    if (it.sl!= 0.0 && ask>it.sl){
-                        exit(it,false,it.sl)
-                    }
-                }
-            }
-        }
-
-        jobQueue.add(job)
-    }
-
-    @Synchronized
-    fun getUserPositions(uuid:UUID): MutableList<Position> {
+    fun asyncGetUserPositions(uuid:UUID, sql:MySQLManager): MutableList<Position> {
 
         val list = mutableListOf<Position>()
 
-        val rs = positionMysql.query("select * from position_table where uuid='${uuid}' and `exit`=0;")
+        val rs = sql.query("select * from position_table where uuid='${uuid}' and `exit`=0;")
 
         if (rs == null){
             Bukkit.getLogger().info("ERROR: Cant get Positions")
@@ -185,6 +94,7 @@ object Forex {
         }
 
         while (rs.next()){
+
             val p = Position(
                 UUID.fromString(rs.getString("position_id")),
                 UUID.fromString(rs.getString("uuid")),
@@ -200,84 +110,147 @@ object Forex {
         }
 
         rs.close()
-        positionMysql.close()
+        sql.close()
 
         return list
     }
 
-
     fun entry(p:Player,lots: Double,isBuy:Boolean){
 
-        val job = Job {
+        val job = Job {sql->
+
             val id = UUID.randomUUID()
             val price = if (isBuy) Price.ask() else Price.bid()
 
-            val maxLots = maxLots(p.uniqueId,price)
+            val maxLots = maxLots(p.uniqueId,price,sql)
+
             //ロット数が証拠金より多い場合
             if (lots> maxLots){
                 if (lots< minLot){
                     p.sendMessage("${prefix}残高があまりにも少ないため、エントリーができません")
                     return@Job
                 }
-                p.sendMessage("${prefix}あなたがエントリーできる最大ロット数は${String.format("%,.2f", maxLots)}までです！")
+                p.sendMessage("${prefix}あなたがエントリーできる最大ロット数は${Utility.format(maxLots,2)}までです！")
                 return@Job
             }
 
+            //新規ポジションを定義
             val position = Position(id,p.uniqueId,lots,price,isBuy,!isBuy,0.0,0.0)
 
-            createPosition(position)
+            sql.execute("INSERT INTO position_table (position_id, player, uuid, lots, buy, sell, `exit`, entry_price, exit_price, profit, entry_date, exit_date) " +
+                    "VALUES ('" +
+                    "${position.positionID}', " +
+                    "'${p.name}', " +
+                    "'${p.uniqueId}', " +
+                    "${position.lots}, " +
+                    "${if (position.buy) 1 else 0}, " +
+                    "${if (position.sell) 1 else 0}, " +
+                    "DEFAULT, " +
+                    "${position.entryPrice}, " +
+                    "null, " +
+                    "null, " +
+                    "DEFAULT, " +
+                    "null);")
 
-            p.sendMessage("${prefix}エントリーを受け付けました！価格:§d§l${String.format("%,.3f", price)}")
-
+            p.sendMessage("${prefix}エントリーを受け付けました！価格:§d§l${Utility.priceFormat(price)}")
         }
 
         jobQueue.add(job)
-
-        return
     }
 
-    private fun exit(position: Position,isLossCut:Boolean,exitPrice: Double? = null):Double{
+    fun exit(uuid: UUID,pos:UUID,isLossCut:Boolean,exitPrice: Double? = null){
 
-        val price = exitPrice ?: if (position.buy) Price.bid() else Price.ask()
-        val profit = profit(position)
+        val job = Job {sql->
+            asyncExit(uuid, pos, isLossCut, sql, exitPrice)
+        }
+        jobQueue.add(job)
+    }
 
-        val job = Job {
+    fun setTP(p:Player,pos:UUID,tp: Double){
 
-            if (profit>0){
-                val msg = if (isLossCut) "強制ロスカット" else "FX利益"
+        val job = Job {sql->
+            val list = asyncGetUserPositions(p.uniqueId, sql)
+            var position : Position? = null
 
-                ForexBank.deposit(position.uuid,profit, "ForexProfit",msg)
-            }
-
-            if (profit<0){
-                val msg = if (isLossCut) "強制ロスカット" else "FXの損失"
-
-                if (!ForexBank.withdraw(position.uuid,-profit, "ForexLoss",msg)){
-                    //ゼロカット
-                    ForexBank.setBalance(position.uuid, 0.0)
+            list.forEach {
+                if (it.positionID == pos){
+                    position = it
+                    return@forEach
                 }
             }
 
-            closePosition(position.positionID,price,profit)
+            if (position == null)return@Job
+
+            if (position!!.buy){
+                val bid = Price.bid()
+                //tpが現在値より低い時は未設定に
+                position!!.tp = if (bid>tp){ 0.0 } else tp
+            }
+
+            if (position!!.sell){
+                val ask = Price.ask()
+                position!!.tp = if (ask<tp){ 0.0 } else tp
+            }
+
+            if (position!!.tp == 0.0){
+
+                if (position!!.buy){
+                    p.sendMessage("${prefix}TPは現在価格より高く設定してください")
+                }else{
+                    p.sendMessage("${prefix}TPは現在価格より低く設定してください")
+                }
+
+            }else{
+                p.sendMessage("${prefix}設定完了")
+            }
+
+            sql.execute("UPDATE position_table SET tp_price = ${position!!.tp} WHERE position_id ='${pos}'")
         }
 
         jobQueue.add(job)
-
-        return profit
     }
 
-    //手動Exit
-    fun exit(p:Player, pos: UUID){
 
-        val list = getUserPositions(p.uniqueId)
+    fun setSL(p:Player,pos:UUID,sl: Double){
 
-        list.forEach {
-            if (it.positionID == pos){
-                val profit = exit(it,false)
-                p.sendMessage("${prefix}ポジションをイグジットしました！(損益:${String.format("%,.0f", profit)})")
-                return@forEach
+        val job = Job {sql->
+            val list = asyncGetUserPositions(p.uniqueId, sql)
+            var position : Position? = null
+
+            list.forEach {
+                if (it.positionID == pos){
+                    position = it
+                    return@forEach
+                }
             }
+
+            if (position == null)return@Job
+
+            if (position!!.buy){
+                val bid = Price.bid()
+                //slが現在値より高い時は未設定に
+                position!!.sl = if (bid<sl){ 0.0 } else sl
+            }
+
+            if (position!!.sell){
+                val ask = Price.ask()
+                position!!.tp = if (ask>sl){ 0.0 } else sl
+            }
+
+            if (position!!.sl == 0.0){
+                if (position!!.buy){
+                    p.sendMessage("${prefix}SLは現在価格より低く設定してください")
+                }else{
+                    p.sendMessage("${prefix}SLは現在価格より高く設定してください")
+                }
+            }else{
+                p.sendMessage("${prefix}設定完了")
+            }
+
+            sql.execute("UPDATE position_table SET sl_price = ${position!!.sl} WHERE position_id ='${pos}'")
         }
+
+        jobQueue.add(job)
     }
 
     fun profit(position:Position): Double {
@@ -317,7 +290,6 @@ object Forex {
 
     //全ポジの含み益
     fun allProfit(list:List<Position>):Double {
-
         var profit = 0.0
         list.forEach { profit+= profit(it) }
 
@@ -340,10 +312,10 @@ object Forex {
     //ロスカットラインに入っているか
     private fun checkLossCut(uuid: UUID){
 
-        val job = Job{
+        val job = Job{sql ->
             val p = Bukkit.getOfflinePlayer(uuid)
 
-            val list = getUserPositions(uuid)
+            var list = asyncGetUserPositions(uuid,sql)
 
             if (list.isEmpty())return@Job
 
@@ -356,33 +328,68 @@ object Forex {
 
             while (percent< lossCutPercent){
 
-                val exitPos = list.first()
+                //損失の大きい順にExit
+                val exitPos = list.minByOrNull { profit(it) }?:return@Job
 
-                exit(exitPos,true)
+                asyncExit(uuid,exitPos.positionID,true,sql)
 
                 if (p.isOnline){ p.player!!.sendMessage("${prefix}§4§l損失が激しいため強制ロスカットを行いました！") }
                 Bukkit.getLogger().info("LOSS CUT ${percent}%")
 
-                list.remove(exitPos)
+                list = asyncGetUserPositions(uuid,sql)
 
                 if (list.isEmpty())return@Job
 
                 margin = margin(uuid,list)
                 require = marginRequirement(list)
                 percent = if (require==0.0) return@Job else margin/require*100.0
-
             }
         }
 
         jobQueue.add(job)
-
     }
 
-    private fun maxLots(uuid: UUID, price: Double):Double{
-        val margin = margin(uuid, getUserPositions(uuid))
-        return margin * leverage  /(price* unitSize)
+    private fun checkTouchTPSL(uuid: UUID){
+
+        val job = Job{sql ->
+            val list = asyncGetUserPositions(uuid, sql)
+
+            list.forEach {
+                if (it.buy){
+                    val bid = Price.bid()
+
+                    if (it.tp!= 0.0 && bid>it.tp){
+                        asyncExit(uuid,it.positionID,false,sql,it.tp)
+                    }
+
+                    if (it.sl!= 0.0 && bid<it.sl){
+                        asyncExit(uuid,it.positionID,false,sql,it.sl)
+                    }
+                }
+
+                if (it.sell){
+                    val ask = Price.ask()
+
+                    if (it.tp!= 0.0 && ask<it.tp){
+                        asyncExit(uuid,it.positionID,false,sql,it.tp)
+                    }
+
+                    if (it.sl!= 0.0 && ask>it.sl){
+                        asyncExit(uuid,it.positionID,false,sql,it.sl)
+                    }
+                }
+            }
+        }
+
+        jobQueue.add(job)
     }
 
+
+    //持てる最大ロットを取得(少数第三以下は切り捨て
+    private fun maxLots(uuid: UUID, price: Double,sql: MySQLManager):Double{
+        val margin = margin(uuid, asyncGetUserPositions(uuid,sql))
+        return floor(margin * leverage  /(price* unitSize)*100)/100.0
+    }
 
     private fun lotsToMan10Money(lots:Double, price: Double):Double{
         return price*lots* unitSize
@@ -398,45 +405,52 @@ object Forex {
     }
 
 
+    //####################################管理スレッド##################################
 
-    //ポジション管理スレッド、ロスカット処理などを行う
+    //ロスカット処理などを行う
     private fun positionThread(){
 
         Bukkit.getLogger().info("StartPositionThread")
 
         val threadDB = MySQLManager(plugin,"positionThread")
 
-        mainLoop@while (true){
+        while (true){
 
-            val rs = threadDB.query("select uuid from position_table where `exit`=0 group by uuid;")?:break@mainLoop
+            try {
+                val rs = threadDB.query("select uuid from position_table where `exit`=0 group by uuid;")?:break
 
-            while (rs.next()){
+                while (rs.next()){
 
-                val uuid = UUID.fromString(rs.getString("uuid"))
+                    val uuid = UUID.fromString(rs.getString("uuid"))
 
-                checkTouchTPSL(uuid)
-                checkLossCut(uuid)
+                    checkTouchTPSL(uuid)
+                    checkLossCut(uuid)
+                }
+
+                rs.close()
+                threadDB.close()
+
+                Thread.sleep(1000)
+
+            }catch (e:java.lang.Exception){
+                Bukkit.getLogger().info(e.message)
             }
-
-            rs.close()
-            queueMysql.close()
-
-            Thread.sleep(1000)
         }
 
         Bukkit.getLogger().info("FinishPositionThread")
         isEnable = false
     }
 
+    //ポジションを管理するスレッド
     private fun queueThread(){
 
         Bukkit.getLogger().info("QueueThread")
+        val queueMysql = MySQLManager(plugin,"Man10Forex")
 
         while (true){
             try {
                 val job = jobQueue.take()
-//                Bukkit.getLogger().info("TakeQueue")
-                job.job()
+                job.job(queueMysql)
             }catch (e:Exception){
                 Bukkit.getLogger().info(e.message)
             }
@@ -444,7 +458,7 @@ object Forex {
     }
 
     private fun interface Job{
-        fun job()
+        fun job(sql:MySQLManager)
     }
 
 
