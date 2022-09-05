@@ -378,11 +378,11 @@ object Command :CommandExecutor{
         val prefix = text(prefix)
         val sellButton = text("§c§l§n[売る]")
             .clickEvent(ClickEvent.suggestCommand("/mfx sell "))
-            .hoverEvent(HoverEvent.showText(text("§c現在価格より下回ったら利益がでます\n§c/mfx sell <ロット数>(0.01〜1000)")))
+            .hoverEvent(HoverEvent.showText(text("§c現在価格より下回ったら利益がでます\n§c/mfx sell <ロット数>(0.01〜1000)\n§f例:1ロットを持った状態でレートが1円下降した場合->+10万円")))
         val space = text("    ")
         val buyButton = text("§a§l§n[買う]")
             .clickEvent(ClickEvent.suggestCommand("/mfx buy "))
-            .hoverEvent(HoverEvent.showText(text("§a現在価格より上回ったら利益がでます\n§a/mfx buy <ロット数>(0.01〜1000)")))
+            .hoverEvent(HoverEvent.showText(text("§a現在価格より上回ったら利益がでます\n§a/mfx buy <ロット数>(0.01〜1000)\n§f例:1ロットを持った状態でレートが1円上昇した場合->+10万円")))
 
 
         p.sendMessage(prefix.append(sellButton).append(space).append(buyButton))
