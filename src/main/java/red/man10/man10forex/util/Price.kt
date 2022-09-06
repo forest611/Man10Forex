@@ -12,8 +12,7 @@ import kotlin.math.roundToInt
 
 object Price : CommandExecutor{
 
-    private const val url = "http://taro:824/api/price"
-
+    var url = "http://taro:824/api/price"
 
     //価格データ取得
     private fun priceData():PriceData?{

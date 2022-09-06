@@ -38,6 +38,7 @@ object Forex {
         lossCutPercent = plugin.config.getDouble("LossCutPercent")
         spread = pipsToPrice(plugin.config.getDouble("SpreadPips"))
         unitSize = plugin.config.getInt("UnitSize")
+        Price.url = plugin.config.getString("PriceURL","http://taro:824/api/price")?:"http://taro:824/api/price"
 
     }
 
@@ -128,6 +129,7 @@ object Forex {
                     p.sendMessage("${prefix}残高があまりにも少ないため、エントリーができません")
                     return@Job
                 }
+
                 p.sendMessage("${prefix}あなたがエントリーできる最大ロット数は${Utility.format(maxLots,2)}までです！")
                 return@Job
             }
@@ -311,30 +313,18 @@ object Forex {
         val job = Job{sql ->
             val p = Bukkit.getOfflinePlayer(uuid)
 
-            Bukkit.getLogger().info("1")
-
             var list = asyncGetUserPositions(uuid,sql)
 
-            Bukkit.getLogger().info("2")
-
             if (list.isEmpty())return@Job
-
-            Bukkit.getLogger().info("3")
 
             //有効証拠金
             var margin = margin(uuid,list)
 
-            Bukkit.getLogger().info("4")
-
             //必要証拠金
             var require = marginRequirement(list)
 
-            Bukkit.getLogger().info("5")
-
             //証拠金維持率
             var percent = if (require==0.0) return@Job else margin/require*100.0
-
-            Bukkit.getLogger().info("6")
 
             while (percent< lossCutPercent){
 
@@ -354,8 +344,6 @@ object Forex {
                 require = marginRequirement(list)
                 percent = if (require==0.0) return@Job else margin/require*100.0
             }
-
-            Bukkit.getLogger().info("7")
 
         }
 
