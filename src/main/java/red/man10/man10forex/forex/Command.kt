@@ -252,6 +252,7 @@ object Command :CommandExecutor{
 
                 if (!sender.hasPermission(OP)){ return true }
                 Forex.loadConfig()
+                Forex.runThread()
                 sender.sendMessage("Reload")
             }
 
@@ -282,8 +283,7 @@ object Command :CommandExecutor{
                 sender.sendMessage("${prefix}exit:${Forex.MarketStatus.exit}")
                 sender.sendMessage("${prefix}deposit:${Forex.MarketStatus.deposit}")
                 sender.sendMessage("${prefix}withdraw:${Forex.MarketStatus.withdraw}")
-                sender.sendMessage("${prefix}PositionThread:${Man10Forex.positionThread.isAlive}")
-                sender.sendMessage("${prefix}QueueThread:${Man10Forex.queueThread.isAlive}")
+                Forex.showQueueStatus(sender)
             }
 
         }

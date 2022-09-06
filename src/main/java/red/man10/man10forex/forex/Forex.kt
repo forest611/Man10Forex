@@ -1,5 +1,7 @@
 package red.man10.man10forex.forex
 
+import net.kyori.adventure.text.Component
+import net.kyori.adventure.text.event.HoverEvent
 import org.bukkit.Bukkit
 import org.bukkit.entity.Player
 import red.man10.man10forex.Man10Forex.Companion.plugin
@@ -23,6 +25,9 @@ object Forex {
     var spread : Double = 0.02  //スプレッド(Price)
 
     private val jobQueue = LinkedBlockingQueue<Job>()
+    private var positionThread = Thread{ positionThread() }
+    private var queueThread = Thread{ queueThread() }
+
 
     fun loadConfig(){
         plugin.reloadConfig()
@@ -55,8 +60,7 @@ object Forex {
         val profit = profit(position!!)
 
         if (profit>0){
-            val msg = if (isLossCut) "強制ロスカット" else "FX利益"
-            ForexBank.deposit(uuid,profit, "ForexProfit",msg)
+            ForexBank.deposit(uuid,profit, "ForexProfit","FX利益")
         }
 
         if (profit<0){
@@ -64,7 +68,8 @@ object Forex {
 
             if (!ForexBank.withdraw(uuid,-profit, "ForexLoss",msg)){
                 //ゼロカット
-                ForexBank.setBalance(uuid, 0.0)
+                val bal = ForexBank.getBalance(uuid)
+                ForexBank.withdraw(uuid,bal,"ZeroCUT","ゼロカット")
             }
         }
 
@@ -299,7 +304,8 @@ object Forex {
 
     //有効証拠金
     fun margin(uuid: UUID,list: List<Position>):Double{
-        val ret = ForexBank.getBalance(uuid) + allProfit(list)
+        val bal = ForexBank.getBalance(uuid)
+        val ret = bal + allProfit(list)
         return if (ret<0.0) 0.0 else ret
     }
 
@@ -404,41 +410,68 @@ object Forex {
 
     //####################################管理スレッド##################################
 
+    fun runThread(){
+
+        if (positionThread.isAlive){
+            positionThread.interrupt()
+            positionThread = Thread{ positionThread() }
+        }
+
+        if (queueThread.isAlive){
+            queueThread.interrupt()
+            queueThread = Thread{ queueThread() }
+        }
+
+        positionThread.start()
+        queueThread.start()
+    }
+
+    fun stopThread() {
+        if (positionThread.isAlive){
+            positionThread.interrupt()
+        }
+
+        if (queueThread.isAlive){
+            queueThread.interrupt()
+        }
+    }
+
     //ロスカット処理などを行う
-    fun positionThread(){
+    private fun positionThread(){
 
         Bukkit.getLogger().info("StartPositionThread")
         val positionMysql = MySQLManager(plugin,"PositionThread")
 
         while (true){
-            Thread.sleep(1000)
 
             try {
-                val rs = positionMysql.query("select uuid from position_table where `exit`=0 group by uuid;")
-
-                if (rs==null){
-                    Bukkit.getLogger().info("rs=null Error")
-                    continue
-                }
-
-                while (rs.next()){
-                    val uuid = UUID.fromString(rs.getString("uuid"))
-
-                    checkTouchTPSL(uuid)
-                    checkLossCut(uuid)
-                }
-
-                rs.close()
-                positionMysql.close()
-
-            }catch (e:java.lang.Exception){
-                Bukkit.getLogger().info(e.message)
+                Thread.sleep(1000)
+            }catch (e:InterruptedException){
+                Bukkit.getLogger().info("Interrupt Position Thread")
+                break
             }
+
+            val rs = positionMysql.query("select uuid from position_table where `exit`=0 group by uuid;")
+
+            if (rs==null){
+                Bukkit.getLogger().info("rs=null Error")
+                continue
+            }
+
+            while (rs.next()){
+                val uuid = UUID.fromString(rs.getString("uuid"))
+
+                checkTouchTPSL(uuid)
+                checkLossCut(uuid)
+            }
+
+            rs.close()
+            positionMysql.close()
         }
     }
 
     //ポジションを管理するスレッド
-    fun queueThread(){
+    private fun queueThread(){
 
         Bukkit.getLogger().info("QueueThread")
         val queueMysql = MySQLManager(plugin,"Man10Forex")
@@ -447,11 +480,26 @@ object Forex {
             try {
                 val job = jobQueue.take()
                 job.job(queueMysql)
-            }catch (e:Exception){
+            }catch (e:InterruptedException){
+                Bukkit.getLogger().info("Interrupt Job Thread")
+                break
+            } catch (e:Exception){
                 Bukkit.getLogger().info(e.message)
             }
         }
     }
+
+    fun showQueueStatus(p:Player){
+        p.sendMessage("${prefix}QueueSize:${jobQueue.size}")
+        p.sendMessage("${prefix}Alive:${queueThread.isAlive}")
+        p.sendMessage("${prefix}State:${queueThread.state.name}")
+        p.sendMessage("${prefix}ToString:${queueThread}")
+        p.sendMessage("${prefix}StackTrace:${queueThread.stackTrace.size}")
+        queueThread.stackTrace.forEach {
+            p.sendMessage("${prefix}${it.methodName}(${it.lineNumber})")
+        }
+    }
+
 
     private fun interface Job{
         fun job(sql:MySQLManager)
