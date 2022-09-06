@@ -29,14 +29,15 @@ class MySQLManager(private val plugin: JavaPlugin, private val conName: String) 
     private var MySQL: MySQLFunc? = null
 
     init {
-        this.connected = false
         loadConfig()
 
-        this.connected = Connect(HOST, DB, USER, PASS, PORT)!!
-
-        if (!this.connected) {
-            plugin.logger.info("Unable to establish a MySQL connection.")
-        }
+//        this.connected = false
+//
+//        this.connected = Connect(HOST, DB, USER, PASS, PORT)!!
+//
+//        if (!this.connected) {
+//            plugin.logger.info("Unable to establish a MySQL connection.")
+//        }
     }
 
     /////////////////////////////////
@@ -44,13 +45,13 @@ class MySQLManager(private val plugin: JavaPlugin, private val conName: String) 
     /////////////////////////////////
     fun loadConfig() {
         //   plugin.getLogger().info("MYSQL Config loading");
-        plugin.reloadConfig()
+//        plugin.reloadConfig()
         HOST = plugin.config.getString("mysql.host")
         USER = plugin.config.getString("mysql.user")
         PASS = plugin.config.getString("mysql.pass")
         PORT = plugin.config.getString("mysql.port")
         DB = plugin.config.getString("mysql.db")
-        plugin.getLogger().info("Config loaded  ${HOST} / ${USER}")
+//        plugin.getLogger().info("Config loaded  ${HOST} / ${USER}")
 
     }
 

@@ -32,7 +32,7 @@ object Price : CommandExecutor{
                     priceData = it
                 }
             }
-
+            response.close()
         }catch (e:java.lang.Exception){
             Bukkit.getLogger().info(e.message)
         }

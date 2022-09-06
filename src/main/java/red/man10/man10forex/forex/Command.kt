@@ -9,6 +9,7 @@ import org.bukkit.command.CommandExecutor
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
 import red.man10.man10bank.Bank
+import red.man10.man10forex.Man10Forex
 import red.man10.man10forex.Man10Forex.Companion.FOREX_USER
 import red.man10.man10forex.Man10Forex.Companion.OP
 import red.man10.man10forex.Man10Forex.Companion.bank
@@ -281,7 +282,8 @@ object Command :CommandExecutor{
                 sender.sendMessage("${prefix}exit:${Forex.MarketStatus.exit}")
                 sender.sendMessage("${prefix}deposit:${Forex.MarketStatus.deposit}")
                 sender.sendMessage("${prefix}withdraw:${Forex.MarketStatus.withdraw}")
-
+                sender.sendMessage("${prefix}PositionThread:${Man10Forex.positionThread.isAlive}")
+                sender.sendMessage("${prefix}QueueThread:${Man10Forex.queueThread.isAlive}")
             }
 
         }

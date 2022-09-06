@@ -19,6 +19,9 @@ class Man10Forex : JavaPlugin() {
         const val OP = "mforex.op"
         const val HIGHLOW_USER = "binary.user"
         const val FOREX_USER = "forex.user"
+
+        val positionThread = Thread{ Forex.positionThread() }
+        val queueThread = Thread{ Forex.queueThread() }
     }
     override fun onEnable() {
         // Plugin startup logic
@@ -37,6 +40,9 @@ class Man10Forex : JavaPlugin() {
         server.pluginManager.registerEvents(MenuFramework.MenuListener,this)
         server.pluginManager.registerEvents(ForexBank,this)
         MySQLManager.runAsyncMySQLQueue(plugin,"Man10Forex")
+
+        positionThread.start()
+        queueThread.start()
 
     }
 

@@ -24,11 +24,6 @@ object Forex {
 
     private val jobQueue = LinkedBlockingQueue<Job>()
 
-    init {
-        Thread{ positionThread() }.start()
-        Thread{ queueThread() }.start()
-    }
-
     fun loadConfig(){
         plugin.reloadConfig()
 
@@ -327,23 +322,23 @@ object Forex {
             //証拠金維持率
             var percent = if (require==0.0) return@Job else margin/require*100.0
 
-            while (percent< lossCutPercent){
+            while (percent< lossCutPercent) {
 
                 //損失の大きい順にExit
-                val exitPos = list.minByOrNull { profit(it) }?:return@Job
+                val exitPos = list.minByOrNull { profit(it) } ?: return@Job
 
-                asyncExit(uuid,exitPos.positionID,true,sql)
+                asyncExit(uuid, exitPos.positionID, true, sql)
 
-                if (p.isOnline){ p.player!!.sendMessage("${prefix}§4§l損失が激しいため強制ロスカットを行いました！") }
+                p.player?.sendMessage("${prefix}§4§l損失が激しいため強制ロスカットを行いました！")
                 Bukkit.getLogger().info("LOSS CUT ${percent}%")
 
-                list = asyncGetUserPositions(uuid,sql)
+                list = asyncGetUserPositions(uuid, sql)
 
-                if (list.isEmpty())return@Job
+                if (list.isEmpty()) return@Job
 
-                margin = margin(uuid,list)
+                margin = margin(uuid, list)
                 require = marginRequirement(list)
-                percent = if (require==0.0) return@Job else margin/require*100.0
+                percent = if (require == 0.0) return@Job else margin / require * 100.0
             }
 
         }
@@ -410,19 +405,23 @@ object Forex {
     //####################################管理スレッド##################################
 
     //ロスカット処理などを行う
-    private fun positionThread(){
+    fun positionThread(){
 
         Bukkit.getLogger().info("StartPositionThread")
-
-        val threadDB = MySQLManager(plugin,"positionThread")
+        val positionMysql = MySQLManager(plugin,"PositionThread")
 
         while (true){
+            Thread.sleep(1000)
 
             try {
-                val rs = threadDB.query("select uuid from position_table where `exit`=0 group by uuid;")?:break
+                val rs = positionMysql.query("select uuid from position_table where `exit`=0 group by uuid;")
+
+                if (rs==null){
+                    Bukkit.getLogger().info("rs=null Error")
+                    continue
+                }
 
                 while (rs.next()){
-
                     val uuid = UUID.fromString(rs.getString("uuid"))
 
                     checkTouchTPSL(uuid)
@@ -430,20 +429,16 @@ object Forex {
                 }
 
                 rs.close()
-                threadDB.close()
-
-                Thread.sleep(1000)
+                positionMysql.close()
 
             }catch (e:java.lang.Exception){
                 Bukkit.getLogger().info(e.message)
             }
         }
-
-        Bukkit.getLogger().info("FinishPositionThread")
     }
 
     //ポジションを管理するスレッド
-    private fun queueThread(){
+    fun queueThread(){
 
         Bukkit.getLogger().info("QueueThread")
         val queueMysql = MySQLManager(plugin,"Man10Forex")
