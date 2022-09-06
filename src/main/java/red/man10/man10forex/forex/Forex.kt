@@ -304,7 +304,8 @@ object Forex {
 
     //有効証拠金
     fun margin(uuid: UUID,list: List<Position>):Double{
-        return ForexBank.getBalance(uuid) + allProfit(list)
+        val ret = ForexBank.getBalance(uuid) + allProfit(list)
+        return if (ret<0.0) 0.0 else ret
     }
 
     //ロスカットラインに入っているか
