@@ -12,18 +12,19 @@ import red.man10.man10forex.util.MySQLManager
 import red.man10.man10forex.util.MySQLManager.Companion.mysqlQueue
 import java.text.SimpleDateFormat
 import java.util.*
-import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.ArrayBlockingQueue
 
 object ForexBank :Listener{
 
 
     private lateinit var mysql : MySQLManager
-    private var bankQueue = LinkedBlockingQueue<Pair<Any,ResultTransaction>>()
+    private var bankQueue = ArrayBlockingQueue<Pair<Any,ResultTransaction>>(16384,true)
     private val simpleDateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm")
+    private val operateThread = Thread{bankQueue()}
 
     init {
         Bukkit.getLogger().info("StartFXBankQueue")
-        Thread{bankQueue()}.start()
+        operateThread.start()
     }
 
     //////////////////////////////////
@@ -245,7 +246,7 @@ object ForexBank :Listener{
                 }
             }catch (e:Exception){
                 errorMessage = e.message.toString()
-                Bukkit.getLogger().info("Man10BankQueueエラー:${errorMessage}")
+                Bukkit.getLogger().info("ForexBankQueueエラー:${errorMessage}")
             }finally {
                 bankTransaction.second.onTransactionResult(errorCode,amount,errorMessage)
             }
@@ -337,17 +338,26 @@ object ForexBank :Listener{
             amount = _amount
             lock.unlock()
         }
-
         lock.lock()
 
         return amount
 
     }
 
+    fun showThreadStatus(p:Player){
+
+        p.sendMessage("ForexBankThread")
+
+        operateThread.stackTrace.forEach {
+            p.sendMessage("${it.className},${it.methodName},${it.lineNumber}")
+        }
+
+    }
+
     ////////////////////////////////
     //講座の作成処理など
     /////////////////////////////////
-    fun initUserData(p:Player){
+    private fun initUserData(p:Player){
         val t = IntTransaction {
             createAccount(p.uniqueId)
             changeName(p)
@@ -376,14 +386,23 @@ object ForexBank :Listener{
 
         @Volatile
         private  var isLock = false
+        @Volatile
+        private var hadLocked = false
 
         fun lock(){
+            if (hadLocked){
+                Bukkit.getLogger().info("このスレッドは既にアンロックされています")
+                return
+            }
             synchronized(this){ isLock = true }
             while (isLock){ Thread.sleep(1) }
         }
 
         fun unlock(){
-            synchronized(this){ isLock = false }
+            synchronized(this){
+                hadLocked = true
+                isLock = false
+            }
         }
     }
 

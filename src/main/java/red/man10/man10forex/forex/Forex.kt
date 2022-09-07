@@ -10,6 +10,7 @@ import red.man10.man10forex.util.MySQLManager
 import red.man10.man10forex.util.Price
 import red.man10.man10forex.util.Utility
 import java.util.*
+import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.LinkedBlockingQueue
 import kotlin.math.floor
 
@@ -24,7 +25,7 @@ object Forex {
     var unitSize : Int = 100000
     var spread : Double = 0.02  //スプレッド(Price)
 
-    private val jobQueue = LinkedBlockingQueue<Job>()
+    private val jobQueue = ArrayBlockingQueue<Job>(16384,true)
     private var positionThread = Thread{ positionThread() }
     private var queueThread = Thread{ queueThread() }
 
@@ -498,6 +499,8 @@ object Forex {
         queueThread.stackTrace.forEach {
             p.sendMessage("${prefix}${it.methodName}(${it.lineNumber})")
         }
+
+        ForexBank.showThreadStatus(p)
     }
 
 
