@@ -14,6 +14,13 @@ object Price : CommandExecutor{
 
     var url = "http://taro:824/api/price"
 
+    private var bid : Double = -1.0
+    private var ask : Double = -1.0
+    private var price : Double = -1.0
+
+    init {
+        Thread{asyncGetPriceThread()}.start()
+    }
     //価格データ取得
     private fun priceData():PriceData?{
 
@@ -42,18 +49,15 @@ object Price : CommandExecutor{
 
     //仲直取得
     fun price():Double{
-        val price : Double
-        val data = priceData()?:return -1.0
-        price = (data.bid+data.ask)/2.0
-        return (price * 1000.0).roundToInt().toDouble()/1000.0
+        return price
     }
 
     fun bid():Double{
-        return price()-spread/2.0
+        return bid
     }
 
     fun ask():Double{
-        return price()+ spread/2.0
+        return ask
     }
 
     data class PriceData(
@@ -64,6 +68,19 @@ object Price : CommandExecutor{
         val ask : Double,
         val time : String
     )
+
+    private fun asyncGetPriceThread(){
+
+        while (true){
+            val data = priceData()?:continue
+            price = (data.bid+data.ask)/2.0
+            bid = price-spread/2.0
+            ask = price+ spread/2.0
+            Thread.sleep(100)
+        }
+
+    }
+
 
     override fun onCommand(sender: CommandSender, command: Command, label: String, args: Array<out String>?): Boolean {
 
