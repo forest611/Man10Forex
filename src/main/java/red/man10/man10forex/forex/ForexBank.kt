@@ -390,11 +390,13 @@ object ForexBank :Listener{
         private var hadLocked = false
 
         fun lock(){
-            if (hadLocked){
-                Bukkit.getLogger().info("このスレッドは既にアンロックされています")
-                return
+            synchronized(this){
+                if (hadLocked){
+//                    Bukkit.getLogger().info("このスレッドは既にアンロックされています")
+                    return
+                }
+                isLock = true
             }
-            synchronized(this){ isLock = true }
             while (isLock){ Thread.sleep(1) }
         }
 

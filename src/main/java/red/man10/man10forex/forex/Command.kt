@@ -9,7 +9,6 @@ import org.bukkit.command.CommandExecutor
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
 import red.man10.man10bank.Bank
-import red.man10.man10forex.Man10Forex
 import red.man10.man10forex.Man10Forex.Companion.FOREX_USER
 import red.man10.man10forex.Man10Forex.Companion.OP
 import red.man10.man10forex.Man10Forex.Companion.bank
@@ -343,7 +342,7 @@ object Command :CommandExecutor{
         p.sendMessage("${prefix}有効金額:${moneyFormat(margin)}")
         p.sendMessage("${prefix}${profitColor}評価額:${moneyFormat(allProfit)}")
         p.sendMessage(percentMsg)
-        p.sendMessage("${prefix}===保有ポジション(クリックしてイグジット(利益確定))===")
+        p.sendMessage("${prefix}===============保有ポジション===============")
 
         list.forEach {
 
@@ -357,23 +356,27 @@ object Command :CommandExecutor{
             val positionDataText = "§7§lポジション情報\n" +
                     "${if (it.buy) "§a§l買" else "§c§l売"}ポジション\n" +
                     "§7ロット数:§l${it.lots}\n" +
-                    "§7オープン価格:§l${priceFormat(it.entryPrice)}"
+                    "§7オープン価格:§l${priceFormat(it.entryPrice)}" +
+                    "§7損益:${profit}${diff}"
 
             val msg = text(prefix+lots+openPrice+profitText+diff)
-                .clickEvent(ClickEvent.runCommand("/mfx exit ${it.positionID}"))
                 .hoverEvent(HoverEvent.showText(text(positionDataText)))
 
-            val showTP = " §a§n[TP${if (it.tp!=0.0) "(${priceFormat(it.tp)})" else ""}]"
-            val showSL = " §c§n[SL${if (it.sl!=0.0) "(${priceFormat(it.sl)})" else ""}]"
+            val exitText = "§e§n[決済]"
+            val tpText = " §a§n[TP${if (it.tp!=0.0) "(${priceFormat(it.tp)})" else ""}]"
+            val slText = " §c§n[SL${if (it.sl!=0.0) "(${priceFormat(it.sl)})" else ""}]"
 
-            val compTP = text(showTP)
+            val exitButton = text(exitText)
+                .clickEvent(ClickEvent.runCommand("/mfx exit ${it.positionID}"))
+                .hoverEvent(HoverEvent.showText(text("現在の価格で損益の確定を行います")))
+            val tpButton = text(tpText)
                 .clickEvent(ClickEvent.suggestCommand("/mfx tp ${it.positionID} "))
                 .hoverEvent(HoverEvent.showText(text("§a自動で利益を確定する価格を設定します")))
-            val compSL = text(showSL)
+            val slButton = text(slText)
                 .clickEvent(ClickEvent.suggestCommand("/mfx sl ${it.positionID} "))
                 .hoverEvent(HoverEvent.showText(text("§c自動で損失を確定する価格を設定します")))
 
-            p.sendMessage(msg.append(compTP).append(compSL))
+            p.sendMessage(msg.append(exitButton).append(tpButton).append(slButton))
 
         }
 

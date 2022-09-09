@@ -3,6 +3,7 @@ version: '1.0'
 main: red.man10.man10forex.Man10Forex
 softdepend:
   - Man10Bank
+  - Man10CommonLibs
 api-version: 1.17
 commands:
   mhl:

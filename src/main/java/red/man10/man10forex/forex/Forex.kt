@@ -1,7 +1,5 @@
 package red.man10.man10forex.forex
 
-import net.kyori.adventure.text.Component
-import net.kyori.adventure.text.event.HoverEvent
 import org.bukkit.Bukkit
 import org.bukkit.entity.Player
 import red.man10.man10forex.Man10Forex.Companion.plugin
@@ -11,7 +9,6 @@ import red.man10.man10forex.util.Price
 import red.man10.man10forex.util.Utility
 import java.util.*
 import java.util.concurrent.ArrayBlockingQueue
-import java.util.concurrent.LinkedBlockingQueue
 import kotlin.math.floor
 
 object Forex {
@@ -25,7 +22,7 @@ object Forex {
     var unitSize : Int = 100000
     var spread : Double = 0.02  //スプレッド(Price)
 
-    private val jobQueue = ArrayBlockingQueue<Job>(16384,true)
+    private val jobQueue = ArrayBlockingQueue<Job>(32768,true)
     private var positionThread = Thread{ positionThread() }
     private var queueThread = Thread{ queueThread() }
 
