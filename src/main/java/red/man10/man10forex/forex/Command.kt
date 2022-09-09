@@ -154,12 +154,12 @@ object Command :CommandExecutor{
             "exit" ->{
 
                 if (!Forex.MarketStatus.exit){
-                    sender.sendMessage("${prefix}現在手動イグジットはできません")
+                    sender.sendMessage("${prefix}現在手動決済はできません")
                     return true
                 }
 
                 if (args.size!=2){
-                    sender.sendMessage("${prefix}イグジット失敗！、正しくイグジットできていない可能性があります！")
+                    sender.sendMessage("${prefix}決済失敗！、正しく決済できていない可能性があります！")
                     return true
                 }
 
@@ -321,7 +321,7 @@ object Command :CommandExecutor{
         val percentColor =  if (percent==0.0) "§f§l" else if (percent< lossCutPercent*1.5) "§4§l" else if (percent< lossCutPercent*2.0) "§6§l"  else "§f§l"
 
         val percentMsg = text("${prefix}${percentColor}維持率:${Utility.format(percent,3)}%")
-            .hoverEvent(HoverEvent.showText(text("§c§l維持率が20.0%を下回ると、ポジションが強制的にイグジットされます")))
+            .hoverEvent(HoverEvent.showText(text("§c§l維持率が20.0%を下回ると、ポジションが強制的に決済されます")))
 
         val balanceMsg = text("${prefix}残高:${moneyFormat(balance)}               ")
             .hoverEvent(HoverEvent.showText(text("§f§nFXの口座は、銀行口座と別のものを使用します")))
@@ -348,7 +348,7 @@ object Command :CommandExecutor{
 
             val profit = profit(it)
 
-            val lots = (if (it.buy) "§a§lB" else "§c§lS") + " ${it.lots}ロット "
+            val lots = (if (it.buy) "§a§l買" else "§c§l売") + " ${it.lots}ロット "
             val openPrice = "O:${priceFormat(it.entryPrice)} "
             val profitText = if (profit>0.0) "§b§l${moneyFormat(profit)}円" else if(profit<0.0) "§4§l${moneyFormat(profit)}円" else "§f§l${moneyFormat(profit)}円"
             val diff = " (${Utility.format(Forex.diffPips(it),2)}Pips)"

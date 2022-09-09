@@ -75,7 +75,7 @@ object Forex {
 
         //オンラインだったらメッセージを送る
         val p = Bukkit.getOfflinePlayer(uuid).player?:return
-        p.sendMessage("${prefix}ポジションをイグジットしました！(損益:${Utility.moneyFormat(profit)})")
+        p.sendMessage("${prefix}ポジションを決済しました！(損益:${Utility.moneyFormat(profit)})")
 
     }
 
