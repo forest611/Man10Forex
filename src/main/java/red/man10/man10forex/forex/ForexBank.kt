@@ -90,23 +90,6 @@ object ForexBank :Listener{
     }
 
 
-    fun setBalance(uuid:UUID,amount: Double){
-
-        val sql = MySQLManager(plugin,"Man10Bank")
-
-        if (amount <0.0)return
-
-        if (!hasAccount(uuid)){
-            createAccount(uuid)
-        }
-
-        val ret = sql.execute("update fx_bank set balance=$amount where uuid='$uuid';")
-
-        if (!ret)return
-
-        addLog(uuid,plugin.name, "SetBalanceByCommand","所持金を${String.format("%,.0f", amount)}にセット", amount,true)
-    }
-
     /**
      * オフライン口座の残高を確認する
      *

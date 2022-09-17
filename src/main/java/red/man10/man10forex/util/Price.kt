@@ -3,12 +3,11 @@ package red.man10.man10forex.util
 import com.google.gson.Gson
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import org.bukkit.Bukkit
 import org.bukkit.command.Command
 import org.bukkit.command.CommandExecutor
 import org.bukkit.command.CommandSender
 import red.man10.man10forex.forex.Forex.spread
-import kotlin.math.roundToInt
+import java.util.*
 
 object Price : CommandExecutor{
 
@@ -22,7 +21,9 @@ object Price : CommandExecutor{
         Thread{asyncGetPriceThread()}.start()
     }
     //価格データ取得
-    private fun priceData():PriceData?{
+    private fun getPriceData():PriceData?{
+
+        if (!isActiveTime())return null
 
         var priceData : PriceData? = null
 
@@ -41,10 +42,36 @@ object Price : CommandExecutor{
             }
             response.close()
         }catch (e:java.lang.Exception){
-            Bukkit.getLogger().info(e.message)
+//            Bukkit.getLogger().info(e.message)
         }
 
         return priceData
+    }
+
+    //取引時間かどうか
+    fun isActiveTime():Boolean{
+        val date = Calendar.getInstance()
+        date.time = Date()
+
+        val hour = if (isSummerTime()) 6 else 7
+        //土日は閉場
+        if (date.get(Calendar.DAY_OF_WEEK)==Calendar.SATURDAY && date.get(Calendar.HOUR_OF_DAY)>hour){ return false }
+        if (date.get(Calendar.DAY_OF_WEEK)==Calendar.SUNDAY){ return false }
+        if (date.get(Calendar.DAY_OF_WEEK)==Calendar.MONDAY && date.get(Calendar.HOUR_OF_DAY)<hour){ return false }
+
+        return true
+    }
+
+    private fun isSummerTime():Boolean{
+
+        val date = Calendar.getInstance()
+        date.time = Date()
+
+        if (date.get(Calendar.MONTH) in 4..10)return true
+        if (date.get(Calendar.MONTH) == 3 && date.get(Calendar.DAY_OF_MONTH)>=14)return true
+        if (date.get(Calendar.MONTH) == 11 && date.get(Calendar.DAY_OF_MONTH)<=7)return true
+
+        return false
     }
 
     //仲直取得
@@ -72,7 +99,7 @@ object Price : CommandExecutor{
     private fun asyncGetPriceThread(){
 
         while (true){
-            val data = priceData()?:continue
+            val data = getPriceData()?:continue
             price = (data.bid+data.ask)/2.0
             bid = price-spread/2.0
             ask = price+ spread/2.0

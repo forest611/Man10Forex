@@ -449,6 +449,8 @@ object Forex {
                 break
             }
 
+            if (!Price.isActiveTime())continue
+
             val rs = positionMysql.query("select uuid from position_table where `exit`=0 group by uuid;")
 
             if (rs==null){
