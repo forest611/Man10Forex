@@ -10,6 +10,7 @@ import red.man10.man10forex.Man10Forex.Companion.HIGHLOW_USER
 import red.man10.man10forex.Man10Forex.Companion.OP
 import red.man10.man10forex.Man10Forex.Companion.bank
 import red.man10.man10forex.Man10Forex.Companion.plugin
+import red.man10.man10forex.forex.Forex
 import red.man10.man10forex.highlow.HighLowGame.isEnableGame
 import red.man10.man10forex.highlow.HighLowGame.loadConfig
 import red.man10.man10forex.highlow.HighLowGame.maxPrice
@@ -18,6 +19,7 @@ import red.man10.man10forex.highlow.HighLowGame.minPrice
 import red.man10.man10forex.highlow.HighLowGame.minSecond
 import red.man10.man10forex.highlow.HighLowGame.prefix
 import red.man10.man10forex.util.MySQLManager
+import red.man10.man10forex.util.Price
 import java.util.*
 
 object Command : CommandExecutor{
@@ -39,6 +41,12 @@ object Command : CommandExecutor{
             "bet" ->{
 
                 if (sender !is Player)return false
+
+                if (!Price.isActiveTime()){
+                    sender.sendMessage("${Forex.prefix}現在取引時間外です")
+                    return true
+                }
+
 
                 if (!sender.hasPermission(HIGHLOW_USER)){ return true }
 
