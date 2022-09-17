@@ -25,6 +25,7 @@ import red.man10.man10forex.forex.Forex.profit
 import red.man10.man10forex.forex.Forex.setSL
 import red.man10.man10forex.forex.Forex.setTP
 import red.man10.man10forex.util.MySQLManager
+import red.man10.man10forex.util.Price
 import red.man10.man10forex.util.Utility
 import red.man10.man10forex.util.Utility.moneyFormat
 import red.man10.man10forex.util.Utility.priceFormat
@@ -56,6 +57,11 @@ object Command :CommandExecutor{
             "entry" ->{
 
                 if (!sender.hasPermission(FOREX_USER)){ return true }
+
+                if (!Price.isActiveTime()){
+                    sender.sendMessage("${prefix}現在取引時間外です")
+                    return true
+                }
 
                 if (!Forex.MarketStatus.entry){
                     sender.sendMessage("${prefix}現在エントリーできません")
@@ -109,6 +115,11 @@ object Command :CommandExecutor{
 
             "tp" ->{
 
+                if (!Price.isActiveTime()){
+                    sender.sendMessage("${prefix}現在取引時間外です")
+                    return true
+                }
+
                 if (args.size!=3){
                     sender.sendMessage("${prefix}入力に問題があります")
                     return true
@@ -131,6 +142,11 @@ object Command :CommandExecutor{
 
             "sl" ->{
 
+                if (!Price.isActiveTime()){
+                    sender.sendMessage("${prefix}現在取引時間外です")
+                    return true
+                }
+
                 if (args.size!=3){
                     sender.sendMessage("${prefix}入力に問題があります")
                     return true
@@ -152,6 +168,11 @@ object Command :CommandExecutor{
             }
 
             "exit" ->{
+
+                if (!Price.isActiveTime()){
+                    sender.sendMessage("${prefix}現在取引時間外です")
+                    return true
+                }
 
                 if (!Forex.MarketStatus.exit){
                     sender.sendMessage("${prefix}現在手動決済はできません")
