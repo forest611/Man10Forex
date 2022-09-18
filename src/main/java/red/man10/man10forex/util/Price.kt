@@ -23,7 +23,7 @@ object Price : CommandExecutor{
     //価格データ取得
     private fun getPriceData():PriceData?{
 
-        if (!isActiveTime())return null
+        if (price!=-1.0 && !isActiveTime())return null
 
         var priceData : PriceData? = null
 
