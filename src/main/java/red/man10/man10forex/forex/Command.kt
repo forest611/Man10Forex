@@ -289,6 +289,7 @@ object Command :CommandExecutor{
             }
 
             "status" ->{
+                if (!sender.hasPermission(OP)){ return true }
 
                 if (args.size==3){
 
@@ -318,6 +319,22 @@ object Command :CommandExecutor{
                 Forex.showQueueStatus(sender)
             }
 
+            "exitop" ->{//mfx exitop player id price
+                if (!sender.hasPermission(OP)){ return true }
+
+                val p =  Bank.getUUID(args[1])
+
+                if (p ==null){
+                    sender.sendMessage("プレイヤーがNull")
+                    return true
+                }
+
+                val id = UUID.fromString(args[2])
+                val price = if (args.size>=4){ args[3].toDoubleOrNull() } else null
+
+                Forex.exit(p,id,false,price)
+
+            }
         }
 
         return true
@@ -341,6 +358,7 @@ object Command :CommandExecutor{
 
     private fun showBalance(p:Player,sql:MySQLManager,mcid:String?=null){
 
+        val isOP = mcid!=null
         val uuid = if (mcid==null) p.uniqueId else Bank.getUUID(mcid)?:return
         val list = asyncGetUserPositions(uuid,sql)
 
@@ -368,7 +386,7 @@ object Command :CommandExecutor{
             .hoverEvent(HoverEvent.showText(text("§fFX口座から、銀行に出金します\n§c§lポジションを持っているときは、出金できません")))
 
 
-        val title = if (mcid==null) "${prefix}§e§l=============[Man10Trader(MT10)]=============" else "${prefix}§c§l=============[${mcid}'s Forex]============="
+        val title = if (!isOP) "${prefix}§e§l=============[Man10Trader(MT10)]=============" else "${prefix}§c§l=============[${mcid}'s Forex]============="
 
         p.sendMessage(title)
         p.sendMessage(balanceMsg.append(depositButton).append(withdrawButton))
@@ -399,9 +417,17 @@ object Command :CommandExecutor{
             val tpText = " §a§n[TP${if (it.tp!=0.0) "(${priceFormat(it.tp)})" else ""}]"
             val slText = " §c§n[SL${if (it.sl!=0.0) "(${priceFormat(it.sl)})" else ""}]"
 
-            val exitButton = text(exitText)
-                .clickEvent(ClickEvent.runCommand("/mfx exit ${it.positionID}"))
-                .hoverEvent(HoverEvent.showText(text("現在の価格で損益の確定を行います")))
+            val exitButton = if (isOP){
+                text(exitText)
+                    .clickEvent(ClickEvent.suggestCommand("/mfx exitop $mcid ${it.positionID}"))
+                    .hoverEvent(HoverEvent.showText(text("ユーザーのポジションをExitします\n/mfx exitop <player> <PositionID> <決済価格(未入力の場合現在価格)>")))
+
+            }else{
+                text(exitText)
+                    .clickEvent(ClickEvent.runCommand("/mfx exit ${it.positionID}"))
+                    .hoverEvent(HoverEvent.showText(text("現在の価格で損益の確定を行います")))
+            }
+
             val tpButton = text(tpText)
                 .clickEvent(ClickEvent.suggestCommand("/mfx tp ${it.positionID} "))
                 .hoverEvent(HoverEvent.showText(text("§a自動で利益を確定する価格を設定します")))
@@ -413,16 +439,20 @@ object Command :CommandExecutor{
 
         }
 
-        val prefix = text(prefix)
-        val sellButton = text("§c§l§n[売る]")
-            .clickEvent(ClickEvent.suggestCommand("/mfx sell "))
-            .hoverEvent(HoverEvent.showText(text("§c現在価格より下回ったら利益がでます\n§c/mfx sell <ロット数>(0.01〜1000)\n§f例:1ロットを持った状態でレートが1円下降した場合->+10万円")))
-        val space = text("    ")
-        val buyButton = text("§a§l§n[買う]")
-            .clickEvent(ClickEvent.suggestCommand("/mfx buy "))
-            .hoverEvent(HoverEvent.showText(text("§a現在価格より上回ったら利益がでます\n§a/mfx buy <ロット数>(0.01〜1000)\n§f例:1ロットを持った状態でレートが1円上昇した場合->+10万円")))
+        if (!isOP){
+            val prefix = text(prefix)
+            val sellButton = text("§c§l§n[売る]")
+                .clickEvent(ClickEvent.suggestCommand("/mfx sell "))
+                .hoverEvent(HoverEvent.showText(text("§c現在価格より下回ったら利益がでます\n§c/mfx sell <ロット数>(0.01〜1000)\n§f例:1ロットを持った状態でレートが1円下降した場合->+10万円")))
+            val space = text("    ")
+            val buyButton = text("§a§l§n[買う]")
+                .clickEvent(ClickEvent.suggestCommand("/mfx buy "))
+                .hoverEvent(HoverEvent.showText(text("§a現在価格より上回ったら利益がでます\n§a/mfx buy <ロット数>(0.01〜1000)\n§f例:1ロットを持った状態でレートが1円上昇した場合->+10万円")))
 
 
-        p.sendMessage(prefix.append(sellButton).append(space).append(buyButton))
+            p.sendMessage(prefix.append(sellButton).append(space).append(buyButton))
+
+        }
+
     }
 }
