@@ -55,7 +55,7 @@ object Forex {
         if (position==null)return
 
         val price = exitPrice ?: if (position!!.buy) Price.bid() else Price.ask()
-        val profit = profit(position!!)
+        val profit = profit(position!!,price)
 
         if (profit>0){
             ForexBank.deposit(uuid,profit, "ForexProfit","FX利益")
@@ -249,17 +249,17 @@ object Forex {
         jobQueue.add(job)
     }
 
-    fun profit(position:Position): Double {
+    fun profit(position:Position,price: Double?=null): Double {
 
         if (position.buy){
-            val bid = Price.bid()
+            val bid = price?:Price.bid()
             val entryMoney = lotsToMan10Money(position.lots,position.entryPrice)
             val nowMoney = lotsToMan10Money(position.lots,bid)
             return nowMoney-entryMoney
         }
 
         if (position.sell){
-            val ask = Price.ask()
+            val ask = price?:Price.ask()
             val entryMoney = lotsToMan10Money(position.lots,position.entryPrice)
             val nowMoney = lotsToMan10Money(position.lots,ask)
             return entryMoney-nowMoney

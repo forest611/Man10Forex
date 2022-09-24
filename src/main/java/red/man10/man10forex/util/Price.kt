@@ -54,6 +54,8 @@ object Price : CommandExecutor{
 
     //取引時間かどうか
     fun isActiveTime():Boolean{
+
+        return true
         val date = Calendar.getInstance()
         date.time = Date()
 
