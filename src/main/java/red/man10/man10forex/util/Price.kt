@@ -17,6 +17,8 @@ object Price : CommandExecutor{
     private var ask : Double = -1.0
     private var price : Double = -1.0
 
+    var error = true
+
     init {
         Thread{asyncGetPriceThread()}.start()
     }
@@ -40,8 +42,10 @@ object Price : CommandExecutor{
                     priceData = it
                 }
             }
+            error = false
             response.close()
         }catch (e:java.lang.Exception){
+            error = true
 //            Bukkit.getLogger().info(e.message)
         }
 
@@ -75,15 +79,15 @@ object Price : CommandExecutor{
     }
 
     //仲直取得
-    fun price():Double{
+    fun price(): Double {
         return price
     }
 
-    fun bid():Double{
+    fun bid(): Double {
         return bid
     }
 
-    fun ask():Double{
+    fun ask(): Double {
         return ask
     }
 

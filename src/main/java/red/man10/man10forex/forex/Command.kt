@@ -29,12 +29,14 @@ import red.man10.man10forex.util.Price
 import red.man10.man10forex.util.Utility
 import red.man10.man10forex.util.Utility.moneyFormat
 import red.man10.man10forex.util.Utility.priceFormat
+import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.LinkedBlockingQueue
 
 object Command :CommandExecutor{
 
     private val showBalanceQueue = LinkedBlockingQueue<Player>()
+    private val sdf = SimpleDateFormat("MM/dd HH:mm")
 
     init {
         Thread{ showBalanceThread() }.start()
@@ -60,6 +62,11 @@ object Command :CommandExecutor{
 
                 if (!Price.isActiveTime()){
                     sender.sendMessage("${prefix}現在取引時間外です")
+                    return true
+                }
+
+                if (Price.error){
+                    sender.sendMessage("${prefix}価格取得に失敗！しばらく続く場合、サーバーにレポートを送ってください(${sdf.format(Date())})。")
                     return true
                 }
 
@@ -171,6 +178,11 @@ object Command :CommandExecutor{
 
                 if (!Price.isActiveTime()){
                     sender.sendMessage("${prefix}現在取引時間外です")
+                    return true
+                }
+
+                if (Price.error){
+                    sender.sendMessage("${prefix}価格取得に失敗！しばらく続く場合、サーバーにレポートを送ってください(${sdf.format(Date())})。")
                     return true
                 }
 
