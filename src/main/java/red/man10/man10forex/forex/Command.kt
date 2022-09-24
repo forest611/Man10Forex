@@ -66,7 +66,7 @@ object Command :CommandExecutor{
                 }
 
                 if (Price.error){
-                    sender.sendMessage("${prefix}価格取得に失敗！しばらく続く場合、サーバーにレポートを送ってください(${sdf.format(Date())})。")
+                    sender.sendMessage("${prefix}価格取得よりエントリー失敗！しばらく続く場合、サーバーにレポートを送ってください(${sdf.format(Date())})。")
                     return true
                 }
 
@@ -182,7 +182,7 @@ object Command :CommandExecutor{
                 }
 
                 if (Price.error){
-                    sender.sendMessage("${prefix}価格取得に失敗！しばらく続く場合、サーバーにレポートを送ってください(${sdf.format(Date())})。")
+                    sender.sendMessage("${prefix}価格取得によりイグジット失敗！しばらく続く場合、サーバーにレポートを送ってください(${sdf.format(Date())})。")
                     return true
                 }
 
