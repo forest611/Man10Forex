@@ -106,20 +106,24 @@ object Price : CommandExecutor{
 
                 val jsonObj = Gson().fromJson(body,Array<DeserializedData>::class.java)
 
+                var checkedDate = false//時刻確認フラグ
+
                 for (obj in jsonObj){
                     val symbol = obj.symbol
 
                     //前回と取得時刻が変わらなかった場合はエラー
-                    if (finalDate == obj.time){
+                    if (finalDate == obj.time && !checkedDate){
                         error = true
                         continue@Main
                     }
 
+                    checkedDate = true
+
                     finalDate = obj.time
 
                     val price = (obj.bid+obj.ask)/2.0
-                    val bid = price+(Forex.spread/2.0)
-                    val ask = price-(Forex.spread/2.0)
+                    val ask = price+(Forex.spread/2.0)
+                    val bid = price-(Forex.spread/2.0)
 
                     val data = PriceData(symbol,bid,ask,price)
 

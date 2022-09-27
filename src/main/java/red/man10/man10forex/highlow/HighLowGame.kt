@@ -20,6 +20,8 @@ object HighLowGame {
     var minSecond = 10
     var maxSecond = 60
 
+    private const val symbol = "USDJPY"
+
     var isEnableGame = true
 
     init {
@@ -56,7 +58,7 @@ object HighLowGame {
     private fun exit(position:Position){
 
         val p = Bukkit.getOfflinePlayer(position.uuid)
-        val price = price()
+        val price = price(symbol)
 
         val isWin = if (price>position.entryPrice && position.isHigh){
             true
@@ -106,7 +108,7 @@ object HighLowGame {
                 }
 
                 //最新価格取得
-                val price = price()
+                val price = price(symbol)
 
                 positionList.forEach {
 
