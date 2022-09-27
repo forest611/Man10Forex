@@ -143,7 +143,9 @@ object Forex {
             val id = UUID.randomUUID()
             val price = if (isBuy) Price.ask(symbol) else Price.bid(symbol)
 
-            val maxLots = maxLots(p.uniqueId,price,sql)
+            val positions = asyncGetUserPositions(p.uniqueId,sql)
+
+            val maxLots = getMaxLots(p.uniqueId,price,positions)
 
             //ロット数が証拠金より多い場合
             if (lots> maxLots){
@@ -319,8 +321,7 @@ object Forex {
     //必要証拠金
     fun marginRequirement(list:List<Position>):Double{
         var margin = 0.0
-        val price = Price.price(symbol)
-        list.forEach { margin+= it.lots* contractSize/ leverage*price }
+        list.forEach { margin+= it.lots* contractSize/ leverage*it.entryPrice }
         return margin
     }
 
@@ -329,6 +330,13 @@ object Forex {
         val bal = ForexBank.getBalance(uuid)
         val ret = bal + allProfit(list)
         return if (ret<0.0) 0.0 else ret
+    }
+
+    //証拠金維持率
+    fun marginPercent(uuid: UUID,list: List<Position>):Double{
+        val margin = margin(uuid, list)
+        val require = marginRequirement(list)
+        return if (require==0.0) 0.0 else margin/require*100.0
     }
 
     //ロスカットラインに入っているか
@@ -344,14 +352,9 @@ object Forex {
 
             if (list.isEmpty())return@Job
 
-            //有効証拠金
-            var margin = margin(uuid,list)
-
-            //必要証拠金
-            var require = marginRequirement(list)
-
             //証拠金維持率
-            var percent = if (require==0.0) return@Job else margin/require*100.0
+            var percent = marginPercent(uuid, list)
+            if (percent == 0.0)return@Job
 
             while (percent< lossCutPercent) {
 
@@ -367,11 +370,10 @@ object Forex {
 
                 if (list.isEmpty()) return@Job
 
-                margin = margin(uuid, list)
-                require = marginRequirement(list)
-                percent = if (require == 0.0) return@Job else margin / require * 100.0
+                //証拠金維持率
+                percent = marginPercent(uuid, list)
+                if (percent == 0.0)return@Job
             }
-
         }
 
         jobQueue.add(job)
@@ -417,8 +419,8 @@ object Forex {
 
 
     //持てる最大ロットを取得(少数第三以下は切り捨て
-    private fun maxLots(uuid: UUID, price: Double,sql: MySQLManager):Double{
-        val margin = margin(uuid, asyncGetUserPositions(uuid,sql))
+    fun getMaxLots(uuid: UUID, price: Double,list:MutableList<Position>):Double{
+        val margin = margin(uuid, list)
         return floor(margin * leverage  /(price* contractSize)*100)/100.0
     }
 

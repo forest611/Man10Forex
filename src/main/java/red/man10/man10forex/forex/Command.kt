@@ -17,7 +17,7 @@ import red.man10.man10forex.forex.Forex.allProfit
 import red.man10.man10forex.forex.Forex.asyncGetUserPositions
 import red.man10.man10forex.forex.Forex.lossCutPercent
 import red.man10.man10forex.forex.Forex.margin
-import red.man10.man10forex.forex.Forex.marginRequirement
+import red.man10.man10forex.forex.Forex.marginPercent
 import red.man10.man10forex.forex.Forex.maxLot
 import red.man10.man10forex.forex.Forex.minLot
 import red.man10.man10forex.forex.Forex.prefix
@@ -407,8 +407,7 @@ object Command :CommandExecutor{
 
         val balance = ForexBank.getBalance(uuid)
         val margin = margin(uuid,list)
-        val require = marginRequirement(list)
-        val percent = if (require==0.0) 0.0 else margin/require*100.0
+        val percent = marginPercent(uuid, list)
         val allProfit = allProfit(list)
 
         val profitColor = if (allProfit<0) "§4§l" else if (allProfit>0) "§b§l" else "§f§l"
@@ -499,8 +498,7 @@ object Command :CommandExecutor{
 
         val balance = ForexBank.getBalance(uuid)
         val margin = margin(uuid,list)
-        val require = marginRequirement(list)
-        val percent = if (require==0.0) 0.0 else margin/require*100.0
+        val percent = marginPercent(uuid, list)
         val allProfit = allProfit(list)
 
         val profitColor = if (allProfit<0) "§4§l" else if (allProfit>0) "§b§l" else "§f§l"
