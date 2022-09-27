@@ -58,20 +58,20 @@ object Command :CommandExecutor{
 
             "help" ->{
 
-                sender.sendMessage("${prefix}/mfx　・・・ mfxのメニューを開きます")
-                sender.sendMessage("${prefix}/mfx buy <ロット数>・・・ 買いポジションを持ちます")
-                sender.sendMessage("${prefix}/mfx sell <ロット数>・・・ 売りポジションを持ちます")
-                sender.sendMessage("${prefix}/mfx tp <価格>　・・・ 利確ラインを設定します")
-                sender.sendMessage("${prefix}/mfx sl <価格>・・・ 損切りラインを設定します")
-                sender.sendMessage("${prefix}/mfx exit ・・・ ボタンでのみ有効")
-                sender.sendMessage("${prefix}/mfx d <金額/all> ・・・ mfx口座に入金をします")
-                sender.sendMessage("${prefix}/mfx w <金額/all> ・・・ mfx口座から出金します")
+                sender.sendMessage("${prefix}/mfx ...mfxのメニューを開きます")
+                sender.sendMessage("${prefix}/mfx buy <ロット数> ... 買いポジションを持ちます")
+                sender.sendMessage("${prefix}/mfx sell <ロット数> ... 売りポジションを持ちます")
+                sender.sendMessage("${prefix}/mfx tp <価格> ... 利確ラインを設定します")
+                sender.sendMessage("${prefix}/mfx sl <価格> ... 損切りラインを設定します")
+                sender.sendMessage("${prefix}/mfx exit ... ボタンでのみ有効")
+                sender.sendMessage("${prefix}/mfx d <金額/all> ... mfx口座に入金をします")
+                sender.sendMessage("${prefix}/mfx w <金額/all> ... mfx口座から出金します")
 
                 if (sender.hasPermission(OP)){
-                    sender.sendMessage("${prefix}§c§l/mfx bal <mcid> ・・・ 指定ユーザーの口座をみます")
-                    sender.sendMessage("${prefix}§c§l/mfx reload ・・・ Configなどを読み直します")
-                    sender.sendMessage("${prefix}§c§l/mfx status <Status> true/false ・・・ ステータスのON/OFF")
-                    sender.sendMessage("${prefix}§c§l/mfx exitop ・・・ ボタンでのみ有効")
+                    sender.sendMessage("${prefix}§c§l/mfx bal <mcid> ... 指定ユーザーの口座をみます")
+                    sender.sendMessage("${prefix}§c§l/mfx reload ... Configなどを読み直します")
+                    sender.sendMessage("${prefix}§c§l/mfx status <Status> true/false ... ステータスのON/OFF")
+                    sender.sendMessage("${prefix}§c§l/mfx exitop ... ボタンでのみ有効")
                 }
 
             }

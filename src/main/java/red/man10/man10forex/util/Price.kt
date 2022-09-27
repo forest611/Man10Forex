@@ -1,6 +1,8 @@
 package red.man10.man10forex.util
 
 import com.google.gson.Gson
+import okhttp3.Cache
+import okhttp3.CacheControl
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.bukkit.command.Command
@@ -84,8 +86,7 @@ object Price : CommandExecutor{
 
     private fun asyncGetPriceThread(){
 
-        val client = OkHttpClient.Builder().readTimeout(1000,TimeUnit.MILLISECONDS).build()
-        val request = Request.Builder().url(url).build()
+        val client = OkHttpClient.Builder().cache(null).build()
 
         Main@while (true){
 
@@ -95,6 +96,7 @@ object Price : CommandExecutor{
 
             try {
 
+                val request = Request.Builder().url(url).build()
                 val response = client.newCall(request).execute()
                 val body = response.body?.string()
 
@@ -105,6 +107,12 @@ object Price : CommandExecutor{
                 }
 
                 val jsonObj = Gson().fromJson(body,Array<DeserializedData>::class.java)
+
+                if (jsonObj == null){
+                    client.connectionPool.evictAll()
+                    error = true
+                    continue@Main
+                }
 
                 var checkedDate = false//時刻確認フラグ
 
