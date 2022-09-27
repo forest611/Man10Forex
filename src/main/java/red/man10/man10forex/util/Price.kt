@@ -97,6 +97,10 @@ object Price : CommandExecutor{
 
             try {
 
+                if (error){
+                    client.connectionPool.evictAll()
+                }
+
                 val request = Request.Builder().url(url).build()
                 val response = client.newCall(request).execute()
                 val body = response.body?.string()
@@ -110,7 +114,6 @@ object Price : CommandExecutor{
                 val jsonObj = Gson().fromJson(body,Array<DeserializedData>::class.java)
 
                 if (jsonObj == null){
-                    client.connectionPool.evictAll()
                     error = true
                     continue@Main
                 }
