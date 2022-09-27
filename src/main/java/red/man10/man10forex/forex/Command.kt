@@ -56,6 +56,26 @@ object Command :CommandExecutor{
 
         when(args[0]){
 
+            "help" ->{
+
+                sender.sendMessage("${prefix}/mfx　・・・ mfxのメニューを開きます")
+                sender.sendMessage("${prefix}/mfx buy <ロット数>・・・ 買いポジションを持ちます")
+                sender.sendMessage("${prefix}/mfx sell <ロット数>・・・ 売りポジションを持ちます")
+                sender.sendMessage("${prefix}/mfx tp <価格>　・・・ 利確ラインを設定します")
+                sender.sendMessage("${prefix}/mfx sl <価格>・・・ 損切りラインを設定します")
+                sender.sendMessage("${prefix}/mfx exit ・・・ ボタンでのみ有効")
+                sender.sendMessage("${prefix}/mfx d <金額/all> ・・・ mfx口座に入金をします")
+                sender.sendMessage("${prefix}/mfx w <金額/all> ・・・ mfx口座から出金します")
+
+                if (sender.hasPermission(OP)){
+                    sender.sendMessage("${prefix}§c§l/mfx bal <mcid> ・・・ 指定ユーザーの口座をみます")
+                    sender.sendMessage("${prefix}§c§l/mfx reload ・・・ Configなどを読み直します")
+                    sender.sendMessage("${prefix}§c§l/mfx status <Status> true/false ・・・ ステータスのON/OFF")
+                    sender.sendMessage("${prefix}§c§l/mfx exitop ・・・ ボタンでのみ有効")
+                }
+
+            }
+
             "entry" ->{
 
                 if (sender!is Player)return false
@@ -492,19 +512,10 @@ object Command :CommandExecutor{
         val balanceMsg = text("${prefix}残高:${moneyFormat(balance)}               ")
             .hoverEvent(HoverEvent.showText(text("§f§nFXの口座は、銀行口座と別のものを使用します")))
 
-        val depositButton = text("§a§n[入金]")
-            .clickEvent(ClickEvent.suggestCommand("/mfx d "))
-            .hoverEvent(HoverEvent.showText(text("§f銀行のお金を、FX口座に入金します")))
-
-        val withdrawButton = text("  §c§n[出金]")
-            .clickEvent(ClickEvent.suggestCommand("/mfx w "))
-            .hoverEvent(HoverEvent.showText(text("§fFX口座から、銀行に出金します\n§c§lポジションを持っているときは、出金できません")))
-
-
         val title = "${prefix}§c§l=============[${mcid}'s Forex]============="
 
         p.sendMessage(title)
-        p.sendMessage(balanceMsg.append(depositButton).append(withdrawButton))
+        p.sendMessage(balanceMsg)
         p.sendMessage("${prefix}有効金額:${moneyFormat(margin)}")
         p.sendMessage("${prefix}${profitColor}評価額:${moneyFormat(allProfit)}")
         p.sendMessage(percentMsg)
@@ -549,7 +560,7 @@ object Command :CommandExecutor{
         }
     }
 
-    fun isAllowed(boolean: Boolean):String{
+    private fun isAllowed(boolean: Boolean):String{
         return if (boolean) "" else "§m"
     }
 }
