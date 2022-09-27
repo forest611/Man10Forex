@@ -114,18 +114,18 @@ object Price : CommandExecutor{
                     continue@Main
                 }
 
-                var checkedDate = false//時刻確認フラグ
+//                var checkedDate = false//時刻確認フラグ
 
                 for (obj in jsonObj){
                     val symbol = obj.symbol
 
-                    //前回と取得時刻が変わらなかった場合はエラー
-                    if (finalDate == obj.time && !checkedDate){
-                        error = true
-                        continue@Main
-                    }
+//                    //前回と取得時刻が変わらなかった場合はエラー
+//                    if (finalDate == obj.time && !checkedDate){
+//                        error = true
+//                        continue@Main
+//                    }
 
-                    checkedDate = true
+//                    checkedDate = true
 
                     finalDate = obj.time
 
