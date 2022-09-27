@@ -438,9 +438,9 @@ object Command :CommandExecutor{
         p.sendMessage(percentMsg)
         p.sendMessage("${prefix}===============保有ポジション===============")
 
-        if (Price.error){
-            p.sendMessage("${prefix}§c§l現在価格取得ができないため、エントリーなどができません")
-        }
+        if (Price.error){ p.sendMessage("${prefix}§c§l現在価格取得ができないため、エントリーなどができません") }
+        if (!Price.isActiveTime()){ p.sendMessage("${prefix}現在取引時間外です") }
+
 
         list.forEach {
 

@@ -17,6 +17,8 @@ object Price : CommandExecutor{
     private var ask : Double = -1.0
     private var price : Double = -1.0
 
+    private var date : String = ""
+
     var error = true
 
     init {
@@ -37,13 +39,23 @@ object Price : CommandExecutor{
 
             val jsonObj = Gson().fromJson(body,Array<PriceData>::class.java)
 
+            response.close()
+
             jsonObj.forEach {
+
+                //前回と取得時刻が変わらなかった場合は止める
+                if (date == it.time){
+                    error = true
+                    return null
+                }
+
+                date = it.time
+
                 if (it.symbol == "USDJPY"){
                     priceData = it
                 }
             }
             error = false
-            response.close()
         }catch (e:java.lang.Exception){
             error = true
 //            Bukkit.getLogger().info(e.message)
@@ -105,7 +117,13 @@ object Price : CommandExecutor{
     private fun asyncGetPriceThread(){
 
         while (true){
-            val data = getPriceData()?:continue
+            val data = getPriceData()
+
+            if (data == null){
+                error = true
+                continue
+            }
+
             price = (data.bid+data.ask)/2.0
             bid = price-spread/2.0
             ask = price+ spread/2.0
