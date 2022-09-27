@@ -6,62 +6,23 @@ import okhttp3.Request
 import org.bukkit.command.Command
 import org.bukkit.command.CommandExecutor
 import org.bukkit.command.CommandSender
-import red.man10.man10forex.forex.Forex.spread
+import red.man10.man10forex.forex.Forex
 import java.util.*
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
 
 object Price : CommandExecutor{
 
     var url = "http://taro:824/api/price"
 
-    private var bid : Double = -1.0
-    private var ask : Double = -1.0
-    private var price : Double = -1.0
+    private val currencyMap = ConcurrentHashMap<String,PriceData>()
 
-    private var date : String = ""
+    var finalDate = ""
 
     var error = true
 
     init {
         Thread{asyncGetPriceThread()}.start()
-    }
-    //価格データ取得
-    private fun getPriceData():PriceData?{
-
-        if (price!=-1.0 && !isActiveTime())return null
-
-        var priceData : PriceData? = null
-
-        try {
-            val client = OkHttpClient()
-            val request = Request.Builder().url(url).build()
-            val response = client.newCall(request).execute()
-            val body = response.body?.string()?:""
-
-            val jsonObj = Gson().fromJson(body,Array<PriceData>::class.java)
-
-            response.close()
-
-            jsonObj.forEach {
-
-                //前回と取得時刻が変わらなかった場合は止める
-                if (date == it.time){
-                    error = true
-                    return null
-                }
-
-                date = it.time
-
-                if (it.symbol == "USDJPY"){
-                    priceData = it
-                }
-            }
-            error = false
-        }catch (e:java.lang.Exception){
-            error = true
-//            Bukkit.getLogger().info(e.message)
-        }
-
-        return priceData
     }
 
     //取引時間かどうか
@@ -93,19 +54,19 @@ object Price : CommandExecutor{
     }
 
     //仲直取得
-    fun price(): Double {
-        return price
+    fun price(symbol: String): Double {
+        return currencyMap[symbol]?.price?:-1.0
     }
 
-    fun bid(): Double {
-        return bid
+    fun bid(symbol: String): Double {
+        return currencyMap[symbol]?.bid?:-1.0
     }
 
-    fun ask(): Double {
-        return ask
+    fun ask(symbol: String): Double {
+        return currencyMap[symbol]?.ask?:-1.0
     }
 
-    data class PriceData(
+    data class DeserializedData(
         val id : String,
         val symbol : String,
         val source : String,
@@ -114,20 +75,61 @@ object Price : CommandExecutor{
         val time : String
     )
 
+    data class PriceData(
+        val symbol : String,
+        val bid : Double,
+        val ask : Double,
+        val price : Double
+    )
+
     private fun asyncGetPriceThread(){
 
-        while (true){
-            val data = getPriceData()
+        val client = OkHttpClient.Builder().readTimeout(1000,TimeUnit.MILLISECONDS).build()
+        val request = Request.Builder().url(url).build()
 
-            if (data == null){
-                error = true
-                continue
-            }
+        Main@while (true){
 
-            price = (data.bid+data.ask)/2.0
-            bid = price-spread/2.0
-            ask = price+ spread/2.0
             Thread.sleep(100)
+
+            if (!isActiveTime())continue@Main
+
+            try {
+
+                val response = client.newCall(request).execute()
+                val body = response.body?.string()
+
+                //レスポンスが返ってこなかったら止める
+                if (body == null){
+                    error = true
+                    continue@Main
+                }
+
+                val jsonObj = Gson().fromJson(body,Array<DeserializedData>::class.java)
+
+                for (obj in jsonObj){
+                    val symbol = obj.symbol
+
+                    //前回と取得時刻が変わらなかった場合はエラー
+                    if (finalDate == obj.time){
+                        error = true
+                        continue@Main
+                    }
+
+                    finalDate = obj.time
+
+                    val price = (obj.bid+obj.ask)/2.0
+                    val bid = price+(Forex.spread/2.0)
+                    val ask = price-(Forex.spread/2.0)
+
+                    val data = PriceData(symbol,bid,ask,price)
+
+                    currencyMap[symbol] = data
+                }
+
+                error = false
+            }catch (e:java.lang.Exception){
+                error = true
+            }
         }
 
     }
@@ -141,17 +143,38 @@ object Price : CommandExecutor{
             return true
         }
 
+        if (args.size!=2){
+            sender.sendMessage("/zfx price/bid/ask symbol")
+            return true
+        }
+
+        val symbol = args[1]
+
         when(args[0]){
+
             "price" ->{
-                Thread{ sender.sendMessage("§d§l現在価格....§f§l${String.format("%,.3f",price())}") }.start()
+
+                if (symbol=="all"){
+                    currencyMap.keys.forEach { sender.sendMessage("§d§l現在価格(${it})....§f§l${String.format("%,.3f",price(it))}") }
+                }else{
+                    sender.sendMessage("§d§l現在価格....§f§l${String.format("%,.3f",price(symbol))}")
+                }
             }
 
             "bid" ->{
-                Thread{ sender.sendMessage("§d§l現在売値....§c§l${String.format("%,.3f", bid())}") }.start()
+                if (symbol=="all"){
+                    currencyMap.keys.forEach { sender.sendMessage("§c§l現在価格(Bid)(${it})....${String.format("%,.3f",bid(it))}") }
+                }else{
+                    sender.sendMessage("§c§l現在価格(Bid)....${String.format("%,.3f",bid(symbol))}")
+                }
             }
 
             "ask" ->{
-                Thread{ sender.sendMessage("§d§l現在買値....§b§l${String.format("%,.3f", ask())}") }.start()
+                if (symbol=="all"){
+                    currencyMap.keys.forEach { sender.sendMessage("§b§l現在価格(Ask)(${it})....${String.format("%,.3f",ask(it))}") }
+                }else{
+                    sender.sendMessage("§b§l現在価格(Ask)....${String.format("%,.3f",ask(symbol))}")
+                }
             }
 
         }

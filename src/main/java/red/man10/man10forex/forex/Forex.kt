@@ -16,6 +16,7 @@ object Forex {
     const val prefix = "§f§l[§c§lM§a§lForex§f§l]"
 
     private var leverage = 100
+    private const val symbol = "USDJPY"
     var minLot : Double = 0.01
     var maxLot : Double = 1000.0
     var lossCutPercent : Double = 20.0
@@ -27,7 +28,7 @@ object Forex {
     private var queueThread = Thread{ queueThread() }
 
     init {
-        Forex.runThread()
+        runThread()
     }
 
 
@@ -77,7 +78,7 @@ object Forex {
 
         if (position==null)return
 
-        val price = exitPrice ?: if (position!!.buy) Price.bid() else Price.ask()
+        val price = exitPrice ?: if (position!!.buy) Price.bid(symbol) else Price.ask(symbol)
         val profit = profit(position!!,price)
 
         if (profit>0){
@@ -140,7 +141,7 @@ object Forex {
         val job = Job {sql->
 
             val id = UUID.randomUUID()
-            val price = if (isBuy) Price.ask() else Price.bid()
+            val price = if (isBuy) Price.ask(symbol) else Price.bid(symbol)
 
             val maxLots = maxLots(p.uniqueId,price,sql)
 
@@ -199,7 +200,7 @@ object Forex {
             if (position == null)return@Job
 
             if (position!!.buy){
-                val bid = Price.bid()
+                val bid = Price.bid(symbol)
                 //tpが現在値より低い時は未設定に
                 position!!.tp = if (bid>tp){ 0.0 } else tp
 
@@ -211,7 +212,7 @@ object Forex {
             }
 
             if (position!!.sell){
-                val ask = Price.ask()
+                val ask = Price.ask(symbol)
                 position!!.tp = if (ask<tp){ 0.0 } else tp
 
                 if (position!!.tp == 0.0){
@@ -244,7 +245,7 @@ object Forex {
             if (position == null)return@Job
 
             if (position!!.buy){
-                val bid = Price.bid()
+                val bid = Price.bid(symbol)
                 //slが現在値より高い時は未設定に
                 position!!.sl = if (bid<sl){ 0.0 } else sl
 
@@ -256,7 +257,7 @@ object Forex {
             }
 
             if (position!!.sell){
-                val ask = Price.ask()
+                val ask = Price.ask(symbol)
                 position!!.sl = if (ask>sl){ 0.0 } else sl
 
                 if (position!!.sl == 0.0){
@@ -275,14 +276,14 @@ object Forex {
     fun profit(position:Position,price: Double?=null): Double {
 
         if (position.buy){
-            val bid = price?:Price.bid()
+            val bid = price?:Price.bid(symbol)
             val entryMoney = lotsToMan10Money(position.lots,position.entryPrice)
             val nowMoney = lotsToMan10Money(position.lots,bid)
             return nowMoney-entryMoney
         }
 
         if (position.sell){
-            val ask = price?:Price.ask()
+            val ask = price?:Price.ask(symbol)
             val entryMoney = lotsToMan10Money(position.lots,position.entryPrice)
             val nowMoney = lotsToMan10Money(position.lots,ask)
             return entryMoney-nowMoney
@@ -295,12 +296,12 @@ object Forex {
     //ポジションの現在価格との差(Pips)
     fun diffPips(position: Position):Double{
         if (position.buy){
-            val bid = Price.bid()
+            val bid = Price.bid(symbol)
             return priceToPips(bid-position.entryPrice)
         }
 
         if (position.sell){
-            val ask = Price.ask()
+            val ask = Price.ask(symbol)
             return priceToPips(position.entryPrice-ask)
         }
 
@@ -318,7 +319,7 @@ object Forex {
     //必要証拠金
     fun marginRequirement(list:List<Position>):Double{
         var margin = 0.0
-        val price = Price.price()
+        val price = Price.price(symbol)
         list.forEach { margin+= it.lots* contractSize/ leverage*price }
         return margin
     }
@@ -386,7 +387,7 @@ object Forex {
 
             list.forEach {
                 if (it.buy){
-                    val bid = Price.bid()
+                    val bid = Price.bid(symbol)
 
                     if (it.tp!= 0.0 && bid>it.tp){
                         asyncExit(uuid,it.positionID,false,sql,it.tp)
@@ -398,7 +399,7 @@ object Forex {
                 }
 
                 if (it.sell){
-                    val ask = Price.ask()
+                    val ask = Price.ask(symbol)
 
                     if (it.tp!= 0.0 && ask<it.tp){
                         asyncExit(uuid,it.positionID,false,sql,it.tp)
