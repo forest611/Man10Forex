@@ -326,7 +326,8 @@ object Command :CommandExecutor{
                         }
 
                         else ->{
-                            sender.sendMessage("${prefix}entry/exit/deposit/withdraw/tpsl/losscut")
+                            sender.sendMessage("${prefix}all/entry/exit/deposit/withdraw/tpsl/losscut")
+                            sender.sendMessage("${prefix}/mfx status <StatusType> true/false")
                         }
                     }
 
@@ -399,11 +400,11 @@ object Command :CommandExecutor{
         val balanceMsg = text("${prefix}残高:${moneyFormat(balance)}               ")
             .hoverEvent(HoverEvent.showText(text("§f§nFXの口座は、銀行口座と別のものを使用します")))
 
-        val depositButton = text("§a§n[入金]")
+        val depositButton = text("§a§n${isAllowed(Forex.MarketStatus.deposit)}[入金]")
             .clickEvent(ClickEvent.suggestCommand("/mfx d "))
             .hoverEvent(HoverEvent.showText(text("§f銀行のお金を、FX口座に入金します")))
 
-        val withdrawButton = text("  §c§n[出金]")
+        val withdrawButton = text("  §c§n${isAllowed(Forex.MarketStatus.withdraw)}[出金]")
             .clickEvent(ClickEvent.suggestCommand("/mfx w "))
             .hoverEvent(HoverEvent.showText(text("§fFX口座から、銀行に出金します\n§c§lポジションを持っているときは、出金できません")))
 
@@ -439,7 +440,7 @@ object Command :CommandExecutor{
             val msg = text(prefix+lots+openPrice+profitText+diff)
                 .hoverEvent(HoverEvent.showText(text(positionDataText)))
 
-            val exitText = "§e§n[決済]"
+            val exitText = "§e§n${isAllowed(Forex.MarketStatus.exit)}[決済]"
             val tpText = " §a§n[TP${if (it.tp!=0.0) "(${priceFormat(it.tp)})" else ""}]"
             val slText = " §c§n[SL${if (it.sl!=0.0) "(${priceFormat(it.sl)})" else ""}]"
 
@@ -460,11 +461,11 @@ object Command :CommandExecutor{
         }
 
         val prefix = text(prefix)
-        val sellButton = text("§c§l§n[売る]")
+        val sellButton = text("§c§l§n${isAllowed(Forex.MarketStatus.entry)}[売る]")
             .clickEvent(ClickEvent.suggestCommand("/mfx sell "))
             .hoverEvent(HoverEvent.showText(text("§c現在価格より下回ったら利益がでます\n§c/mfx sell <ロット数>(0.01〜1000)\n§f例:1ロットを持った状態でレートが1円下降した場合->+10万円")))
         val space = text("    ")
-        val buyButton = text("§a§l§n[買う]")
+        val buyButton = text("§a§l§n${isAllowed(Forex.MarketStatus.entry)}[買う]")
             .clickEvent(ClickEvent.suggestCommand("/mfx buy "))
             .hoverEvent(HoverEvent.showText(text("§a現在価格より上回ったら利益がでます\n§a/mfx buy <ロット数>(0.01〜1000)\n§f例:1ロットを持った状態でレートが1円上昇した場合->+10万円")))
 
@@ -546,6 +547,9 @@ object Command :CommandExecutor{
             p.sendMessage(msg.append(exitButton).append(tpButton).append(slButton))
 
         }
+    }
 
+    fun isAllowed(boolean: Boolean):String{
+        return if (boolean) "" else "§m"
     }
 }

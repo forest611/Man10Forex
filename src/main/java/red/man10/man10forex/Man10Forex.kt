@@ -39,8 +39,6 @@ class Man10Forex : JavaPlugin() {
         server.pluginManager.registerEvents(ForexBank,this)
         MySQLManager.runAsyncMySQLQueue(plugin,"Man10Forex")
 
-        Forex.runThread()
-
     }
 
     override fun onDisable() {

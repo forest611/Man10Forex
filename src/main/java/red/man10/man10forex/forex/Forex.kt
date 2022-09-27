@@ -26,6 +26,10 @@ object Forex {
     private var positionThread = Thread{ positionThread() }
     private var queueThread = Thread{ queueThread() }
 
+    init {
+        Forex.runThread()
+    }
+
 
     fun loadConfig(){
         plugin.reloadConfig()
