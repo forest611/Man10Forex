@@ -333,10 +333,10 @@ object Forex {
     }
 
     //証拠金維持率
-    fun marginPercent(uuid: UUID,list: List<Position>):Double{
+    fun marginPercent(uuid: UUID,list: List<Position>):Double?{
         val margin = margin(uuid, list)
         val require = marginRequirement(list)
-        return if (require==0.0) 0.0 else margin/require*100.0
+        return if (require==0.0) null else margin/require*100.0
     }
 
     //ロスカットラインに入っているか
@@ -353,8 +353,7 @@ object Forex {
             if (list.isEmpty())return@Job
 
             //証拠金維持率
-            var percent = marginPercent(uuid, list)
-            if (percent == 0.0)return@Job
+            var percent = marginPercent(uuid, list)?:return@Job
 
             while (percent< lossCutPercent) {
 
@@ -371,8 +370,7 @@ object Forex {
                 if (list.isEmpty()) return@Job
 
                 //証拠金維持率
-                percent = marginPercent(uuid, list)
-                if (percent == 0.0)return@Job
+                percent = marginPercent(uuid, list)?:return@Job
             }
         }
 

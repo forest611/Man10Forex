@@ -407,7 +407,7 @@ object Command :CommandExecutor{
 
         val balance = ForexBank.getBalance(uuid)
         val margin = margin(uuid,list)
-        val percent = marginPercent(uuid, list)
+        val percent = marginPercent(uuid, list)?:0.0
         val allProfit = allProfit(list)
 
         val profitColor = if (allProfit<0) "§4§l" else if (allProfit>0) "§b§l" else "§f§l"
@@ -498,7 +498,7 @@ object Command :CommandExecutor{
 
         val balance = ForexBank.getBalance(uuid)
         val margin = margin(uuid,list)
-        val percent = marginPercent(uuid, list)
+        val percent = marginPercent(uuid, list)?:0.0
         val allProfit = allProfit(list)
 
         val profitColor = if (allProfit<0) "§4§l" else if (allProfit>0) "§b§l" else "§f§l"
