@@ -19,7 +19,7 @@ object Forex {
     var minLot : Double = 0.01
     var maxLot : Double = 1000.0
     var lossCutPercent : Double = 20.0
-    var unitSize : Int = 100000
+    var contractSize : Int = 100000
     var spread : Double = 0.02  //スプレッド(Price)
 
     private val jobQueue = ArrayBlockingQueue<Job>(32768,true)
@@ -35,9 +35,28 @@ object Forex {
         maxLot = plugin.config.getDouble("MaxLot")
         lossCutPercent = plugin.config.getDouble("LossCutPercent")
         spread = pipsToPrice(plugin.config.getDouble("SpreadPips"))
-        unitSize = plugin.config.getInt("UnitSize")
+        contractSize = plugin.config.getInt("UnitSize")
         Price.url = plugin.config.getString("PriceURL","http://taro:824/api/price")?:"http://taro:824/api/price"
 
+        MarketStatus.entry = plugin.config.getBoolean("Status.Entry")
+        MarketStatus.exit = plugin.config.getBoolean("Status.Exit")
+        MarketStatus.withdraw = plugin.config.getBoolean("Status.Withdraw")
+        MarketStatus.deposit = plugin.config.getBoolean("Status.Deposit")
+        MarketStatus.tpsl = plugin.config.getBoolean("Status.TPSL")
+        MarketStatus.lossCut = plugin.config.getBoolean("Status.LossCut")
+
+    }
+
+    fun setStatus(){
+
+        plugin.config.set("Status.Entry",MarketStatus.entry)
+        plugin.config.set("Status.Exit",MarketStatus.exit)
+        plugin.config.set("Status.Withdraw",MarketStatus.withdraw)
+        plugin.config.set("Status.Deposit",MarketStatus.deposit)
+        plugin.config.set("Status.TPSL",MarketStatus.tpsl)
+        plugin.config.set("Status.LossCut",MarketStatus.lossCut)
+
+        plugin.saveConfig()
     }
 
     private fun asyncExit(uuid: UUID, pos:UUID, isLossCut:Boolean, sql: MySQLManager, exitPrice: Double? = null){
@@ -296,7 +315,7 @@ object Forex {
     fun marginRequirement(list:List<Position>):Double{
         var margin = 0.0
         val price = Price.price()
-        list.forEach { margin+= it.lots* unitSize/ leverage*price }
+        list.forEach { margin+= it.lots* contractSize/ leverage*price }
         return margin
     }
 
@@ -311,6 +330,9 @@ object Forex {
     private fun checkLossCut(uuid: UUID){
 
         val job = Job{sql ->
+
+            if (Price.error)return@Job
+
             val p = Bukkit.getOfflinePlayer(uuid)
 
             var list = asyncGetUserPositions(uuid,sql)
@@ -353,6 +375,9 @@ object Forex {
     private fun checkTouchTPSL(uuid: UUID){
 
         val job = Job{sql ->
+
+            if (Price.error)return@Job
+
             val list = asyncGetUserPositions(uuid, sql)
 
             list.forEach {
@@ -389,11 +414,11 @@ object Forex {
     //持てる最大ロットを取得(少数第三以下は切り捨て
     private fun maxLots(uuid: UUID, price: Double,sql: MySQLManager):Double{
         val margin = margin(uuid, asyncGetUserPositions(uuid,sql))
-        return floor(margin * leverage  /(price* unitSize)*100)/100.0
+        return floor(margin * leverage  /(price* contractSize)*100)/100.0
     }
 
     private fun lotsToMan10Money(lots:Double, price: Double):Double{
-        return floor(price*lots* unitSize)
+        return floor(price*lots* contractSize)
     }
 
     //ドル円のみ対応
@@ -463,6 +488,7 @@ object Forex {
 
                 checkTouchTPSL(uuid)
                 checkLossCut(uuid)
+
             }
 
             rs.close()
@@ -524,6 +550,8 @@ object Forex {
         var exit = true
         var deposit = true
         var withdraw = true
+        var tpsl = true
+        var lossCut = true
     }
 
 }

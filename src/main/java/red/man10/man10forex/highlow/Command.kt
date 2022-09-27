@@ -29,8 +29,20 @@ object Command : CommandExecutor{
 
         if (args.isNullOrEmpty()){
 
-            if (!sender.hasPermission(HIGHLOW_USER))return false
             if (sender !is Player)return false
+
+            if (!Price.isActiveTime()){
+                sender.sendMessage("${Forex.prefix}現在取引時間外です")
+                return true
+            }
+
+            if (!sender.hasPermission(HIGHLOW_USER)){ return true }
+
+            if (!isEnableGame){
+                sender.sendMessage("${prefix}現在ハイ&ローの取引が停止しています")
+                return true
+            }
+
             Menu(sender).open()
             return true
         }
@@ -114,18 +126,20 @@ object Command : CommandExecutor{
                 if (!sender.hasPermission(OP)){ return true }
                 loadConfig()
                 HighLowGame.closeAll()
-
+                sender.sendMessage("${prefix}リロード完了")
             }
 
             "off" ->{
                 if (!sender.hasPermission(OP)){ return true }
                 isEnableGame = false
+                sender.sendMessage("${prefix}ハイローをオフにしました")
+                return true
             }
 
             "on" ->{
                 if (!sender.hasPermission(OP)){ return true }
                 isEnableGame = true
-
+                sender.sendMessage("${prefix}ハイローをオンにしました")
             }
 
             "ranking" ->{

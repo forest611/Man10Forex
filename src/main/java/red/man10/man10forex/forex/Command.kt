@@ -45,9 +45,9 @@ object Command :CommandExecutor{
     override fun onCommand(sender: CommandSender, command: Command, label: String, args: Array<out String>?): Boolean {
 
         if (label!="mfx")return false
-        if (sender!is Player)return false
 
         if (args.isNullOrEmpty()){
+            if (sender!is Player)return false
 
             if (!sender.hasPermission(FOREX_USER)){ return true }
             showBalanceQueue.add(sender)
@@ -57,6 +57,8 @@ object Command :CommandExecutor{
         when(args[0]){
 
             "entry" ->{
+
+                if (sender!is Player)return false
 
                 if (!sender.hasPermission(FOREX_USER)){ return true }
 
@@ -105,6 +107,8 @@ object Command :CommandExecutor{
             }
 
             "buy" ->{
+                if (sender!is Player)return false
+
                 if (args.size!=2){
                     sender.sendMessage("${prefix}/mfx buy <ロット数>")
                     return false
@@ -113,6 +117,8 @@ object Command :CommandExecutor{
             }
 
             "sell" ->{
+                if (sender!is Player)return false
+
                 if (args.size!=2){
                     sender.sendMessage("${prefix}/mfx sell <ロット数>")
                     return false
@@ -121,6 +127,7 @@ object Command :CommandExecutor{
             }
 
             "tp" ->{
+                if (sender!is Player)return false
 
                 if (!Price.isActiveTime()){
                     sender.sendMessage("${prefix}現在取引時間外です")
@@ -148,6 +155,7 @@ object Command :CommandExecutor{
             }
 
             "sl" ->{
+                if (sender!is Player)return false
 
                 if (!Price.isActiveTime()){
                     sender.sendMessage("${prefix}現在取引時間外です")
@@ -175,6 +183,7 @@ object Command :CommandExecutor{
             }
 
             "exit" ->{
+                if (sender!is Player)return false
 
                 if (!Price.isActiveTime()){
                     sender.sendMessage("${prefix}現在取引時間外です")
@@ -205,6 +214,8 @@ object Command :CommandExecutor{
 
             "d" ->{
 
+                if (sender!is Player)return false
+
                 if (!Forex.MarketStatus.deposit){
                     sender.sendMessage("${prefix}現在FX口座への入金はできません")
                     return true
@@ -234,6 +245,8 @@ object Command :CommandExecutor{
             }
 
             "w" ->{
+
+                if (sender!is Player)return false
 
                 if (!Forex.MarketStatus.withdraw){
                     sender.sendMessage("${prefix}現在FX口座から出金はできません")
@@ -275,7 +288,7 @@ object Command :CommandExecutor{
 
                 Thread{
                     val sql = MySQLManager(plugin,"ShowBalanceOP")
-                    showBalance(sender,sql,mcid)
+                    showBalanceOP(sender,sql,mcid)
                 }.start()
 
             }
@@ -299,6 +312,8 @@ object Command :CommandExecutor{
                         "exit" ->Forex.MarketStatus.exit = args[2].toBoolean()
                         "deposit" ->Forex.MarketStatus.deposit = args[2].toBoolean()
                         "withdraw" ->Forex.MarketStatus.withdraw = args[2].toBoolean()
+                        "tpsl" -> Forex.MarketStatus.tpsl = args[2].toBoolean()
+                        "losscut" -> Forex.MarketStatus.lossCut = args[2].toBoolean()
 
                         "all" ->{
                             val bool = args[2].toBoolean()
@@ -306,9 +321,13 @@ object Command :CommandExecutor{
                             Forex.MarketStatus.exit = bool
                             Forex.MarketStatus.deposit = bool
                             Forex.MarketStatus.withdraw = bool
+                            Forex.MarketStatus.tpsl = bool
+                            Forex.MarketStatus.lossCut = bool
                         }
 
-                        else ->{}
+                        else ->{
+                            sender.sendMessage("${prefix}entry/exit/deposit/withdraw/tpsl/losscut")
+                        }
                     }
 
                 }
@@ -316,7 +335,11 @@ object Command :CommandExecutor{
                 sender.sendMessage("${prefix}exit:${Forex.MarketStatus.exit}")
                 sender.sendMessage("${prefix}deposit:${Forex.MarketStatus.deposit}")
                 sender.sendMessage("${prefix}withdraw:${Forex.MarketStatus.withdraw}")
-                Forex.showQueueStatus(sender)
+                sender.sendMessage("${prefix}tpsl:${Forex.MarketStatus.tpsl}")
+                sender.sendMessage("${prefix}losscut:${Forex.MarketStatus.lossCut}")
+
+                Forex.setStatus()
+                //Forex.showQueueStatus(sender)
             }
 
             "exitop" ->{//mfx exitop player id price
@@ -356,10 +379,9 @@ object Command :CommandExecutor{
         }
     }
 
-    private fun showBalance(p:Player,sql:MySQLManager,mcid:String?=null){
+    private fun showBalance(p:Player,sql:MySQLManager){
 
-        val isOP = mcid!=null
-        val uuid = if (mcid==null) p.uniqueId else Bank.getUUID(mcid)?:return
+        val uuid = p.uniqueId
         val list = asyncGetUserPositions(uuid,sql)
 
         val balance = ForexBank.getBalance(uuid)
@@ -386,7 +408,99 @@ object Command :CommandExecutor{
             .hoverEvent(HoverEvent.showText(text("§fFX口座から、銀行に出金します\n§c§lポジションを持っているときは、出金できません")))
 
 
-        val title = if (!isOP) "${prefix}§e§l=============[Man10Trader(MT10)]=============" else "${prefix}§c§l=============[${mcid}'s Forex]============="
+        val title = "${prefix}§e§l=============[Man10Trader(MT10)]============="
+
+        p.sendMessage(title)
+        p.sendMessage(balanceMsg.append(depositButton).append(withdrawButton))
+        p.sendMessage("${prefix}有効金額:${moneyFormat(margin)}")
+        p.sendMessage("${prefix}${profitColor}評価額:${moneyFormat(allProfit)}")
+        p.sendMessage(percentMsg)
+        p.sendMessage("${prefix}===============保有ポジション===============")
+
+        if (Price.error){
+            p.sendMessage("${prefix}§c§l現在価格取得ができないため、エントリーなどができません")
+        }
+
+        list.forEach {
+
+            val profit = profit(it)
+
+            val lots = (if (it.buy) "§a§l買" else "§c§l売") + " ${it.lots}ロット "
+            val openPrice = "O:${priceFormat(it.entryPrice)} "
+            val profitText = if (profit>0.0) "§b§l${moneyFormat(profit)}円" else if(profit<0.0) "§4§l${moneyFormat(profit)}円" else "§f§l${moneyFormat(profit)}円"
+            val diff = " (${Utility.format(Forex.diffPips(it),2)}Pips)"
+
+            val positionDataText = "§7§lポジション情報\n" +
+                    "${if (it.buy) "§a§l買" else "§c§l売"}ポジション\n" +
+                    "§7ロット数:§l${it.lots}\n" +
+                    "§7オープン価格:§l${priceFormat(it.entryPrice)}" +
+                    "§7損益:${profit}${diff}"
+
+            val msg = text(prefix+lots+openPrice+profitText+diff)
+                .hoverEvent(HoverEvent.showText(text(positionDataText)))
+
+            val exitText = "§e§n[決済]"
+            val tpText = " §a§n[TP${if (it.tp!=0.0) "(${priceFormat(it.tp)})" else ""}]"
+            val slText = " §c§n[SL${if (it.sl!=0.0) "(${priceFormat(it.sl)})" else ""}]"
+
+            val exitButton = text(exitText)
+                .clickEvent(ClickEvent.runCommand("/mfx exit ${it.positionID}"))
+                .hoverEvent(HoverEvent.showText(text("現在の価格で損益の確定を行います")))
+
+
+            val tpButton = text(tpText)
+                .clickEvent(ClickEvent.suggestCommand("/mfx tp ${it.positionID} "))
+                .hoverEvent(HoverEvent.showText(text("§a自動で利益を確定する価格を設定します")))
+            val slButton = text(slText)
+                .clickEvent(ClickEvent.suggestCommand("/mfx sl ${it.positionID} "))
+                .hoverEvent(HoverEvent.showText(text("§c自動で損失を確定する価格を設定します")))
+
+            p.sendMessage(msg.append(exitButton).append(tpButton).append(slButton))
+
+        }
+
+        val prefix = text(prefix)
+        val sellButton = text("§c§l§n[売る]")
+            .clickEvent(ClickEvent.suggestCommand("/mfx sell "))
+            .hoverEvent(HoverEvent.showText(text("§c現在価格より下回ったら利益がでます\n§c/mfx sell <ロット数>(0.01〜1000)\n§f例:1ロットを持った状態でレートが1円下降した場合->+10万円")))
+        val space = text("    ")
+        val buyButton = text("§a§l§n[買う]")
+            .clickEvent(ClickEvent.suggestCommand("/mfx buy "))
+            .hoverEvent(HoverEvent.showText(text("§a現在価格より上回ったら利益がでます\n§a/mfx buy <ロット数>(0.01〜1000)\n§f例:1ロットを持った状態でレートが1円上昇した場合->+10万円")))
+
+        p.sendMessage(prefix.append(sellButton).append(space).append(buyButton))
+    }
+
+    private fun showBalanceOP(p:CommandSender,sql: MySQLManager,mcid:String){
+
+        val uuid = Bank.getUUID(mcid)?:return
+        val list = asyncGetUserPositions(uuid,sql)
+
+        val balance = ForexBank.getBalance(uuid)
+        val margin = margin(uuid,list)
+        val require = marginRequirement(list)
+        val percent = if (require==0.0) 0.0 else margin/require*100.0
+        val allProfit = allProfit(list)
+
+        val profitColor = if (allProfit<0) "§4§l" else if (allProfit>0) "§b§l" else "§f§l"
+        val percentColor =  if (percent==0.0) "§f§l" else if (percent< lossCutPercent*1.5) "§4§l" else if (percent< lossCutPercent*2.0) "§6§l"  else "§f§l"
+
+        val percentMsg = text("${prefix}${percentColor}維持率:${Utility.format(percent,3)}%")
+            .hoverEvent(HoverEvent.showText(text("§c§l維持率が20.0%を下回ると、ポジションが強制的に決済されます")))
+
+        val balanceMsg = text("${prefix}残高:${moneyFormat(balance)}               ")
+            .hoverEvent(HoverEvent.showText(text("§f§nFXの口座は、銀行口座と別のものを使用します")))
+
+        val depositButton = text("§a§n[入金]")
+            .clickEvent(ClickEvent.suggestCommand("/mfx d "))
+            .hoverEvent(HoverEvent.showText(text("§f銀行のお金を、FX口座に入金します")))
+
+        val withdrawButton = text("  §c§n[出金]")
+            .clickEvent(ClickEvent.suggestCommand("/mfx w "))
+            .hoverEvent(HoverEvent.showText(text("§fFX口座から、銀行に出金します\n§c§lポジションを持っているときは、出金できません")))
+
+
+        val title = "${prefix}§c§l=============[${mcid}'s Forex]============="
 
         p.sendMessage(title)
         p.sendMessage(balanceMsg.append(depositButton).append(withdrawButton))
@@ -417,16 +531,10 @@ object Command :CommandExecutor{
             val tpText = " §a§n[TP${if (it.tp!=0.0) "(${priceFormat(it.tp)})" else ""}]"
             val slText = " §c§n[SL${if (it.sl!=0.0) "(${priceFormat(it.sl)})" else ""}]"
 
-            val exitButton = if (isOP){
-                text(exitText)
-                    .clickEvent(ClickEvent.suggestCommand("/mfx exitop $mcid ${it.positionID}"))
-                    .hoverEvent(HoverEvent.showText(text("ユーザーのポジションをExitします\n/mfx exitop <player> <PositionID> <決済価格(未入力の場合現在価格)>")))
+            val exitButton = text(exitText)
+                .clickEvent(ClickEvent.suggestCommand("/mfx exitop $mcid ${it.positionID}"))
+                .hoverEvent(HoverEvent.showText(text("ユーザーのポジションをExitします\n/mfx exitop <player> <PositionID> <決済価格(未入力の場合現在価格)>")))
 
-            }else{
-                text(exitText)
-                    .clickEvent(ClickEvent.runCommand("/mfx exit ${it.positionID}"))
-                    .hoverEvent(HoverEvent.showText(text("現在の価格で損益の確定を行います")))
-            }
 
             val tpButton = text(tpText)
                 .clickEvent(ClickEvent.suggestCommand("/mfx tp ${it.positionID} "))
@@ -436,21 +544,6 @@ object Command :CommandExecutor{
                 .hoverEvent(HoverEvent.showText(text("§c自動で損失を確定する価格を設定します")))
 
             p.sendMessage(msg.append(exitButton).append(tpButton).append(slButton))
-
-        }
-
-        if (!isOP){
-            val prefix = text(prefix)
-            val sellButton = text("§c§l§n[売る]")
-                .clickEvent(ClickEvent.suggestCommand("/mfx sell "))
-                .hoverEvent(HoverEvent.showText(text("§c現在価格より下回ったら利益がでます\n§c/mfx sell <ロット数>(0.01〜1000)\n§f例:1ロットを持った状態でレートが1円下降した場合->+10万円")))
-            val space = text("    ")
-            val buyButton = text("§a§l§n[買う]")
-                .clickEvent(ClickEvent.suggestCommand("/mfx buy "))
-                .hoverEvent(HoverEvent.showText(text("§a現在価格より上回ったら利益がでます\n§a/mfx buy <ロット数>(0.01〜1000)\n§f例:1ロットを持った状態でレートが1円上昇した場合->+10万円")))
-
-
-            p.sendMessage(prefix.append(sellButton).append(space).append(buyButton))
 
         }
 
