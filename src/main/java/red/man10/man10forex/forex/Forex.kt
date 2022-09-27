@@ -415,6 +415,10 @@ object Forex {
         jobQueue.add(job)
     }
 
+    private fun checkPending(uuid: UUID){
+
+    }
+
 
     //持てる最大ロットを取得(少数第三以下は切り捨て
     fun getMaxLots(uuid: UUID, price: Double,list:MutableList<Position>):Double{

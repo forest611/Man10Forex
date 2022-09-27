@@ -22,6 +22,7 @@ object Price : CommandExecutor{
     var finalDate = ""
 
     var error = true
+    var dateCount = 0
 
     init {
         Thread{asyncGetPriceThread()}.start()
@@ -114,18 +115,20 @@ object Price : CommandExecutor{
                     continue@Main
                 }
 
-//                var checkedDate = false//時刻確認フラグ
+                var checkedDate = false//時刻確認フラグ
 
                 for (obj in jsonObj){
                     val symbol = obj.symbol
 
-//                    //前回と取得時刻が変わらなかった場合はエラー
-//                    if (finalDate == obj.time && !checkedDate){
-//                        error = true
-//                        continue@Main
-//                    }
+                    //前回と取得時刻が変わらなかった場合はエラー
+                    if (finalDate == obj.time && !checkedDate){
+                        dateCount++
+                        if (dateCount>=20){ error = true }
+                        continue@Main
+                    }
 
-//                    checkedDate = true
+                    checkedDate = true
+                    dateCount = 0
 
                     finalDate = obj.time
 
