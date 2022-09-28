@@ -22,6 +22,7 @@ object Forex {
     var lossCutPercent : Double = 20.0
 
     var symbols = ConcurrentHashMap<String,Symbol>()
+    var symbolList = mutableListOf<String>()
 
 
     //シンボルデータ
@@ -31,8 +32,8 @@ object Forex {
         var minLot : Double = 0.01
         var maxLot : Double = 1000.0
         var contractSize : Int = 100000
-        var spread : Double = 0.02  //スプレッド(Price)
-        var pipsAmount : Double = 100.0 //Priceにいくつ書けるとPipsになるか
+        var spread : Double = 2.0  //スプレッド(Pips)
+        var pipsAmount : Int = 100 //Priceにいくつ書けるとPipsになるか
 
         init {
             loadConfig()
@@ -58,8 +59,8 @@ object Forex {
             leverage = plugin.config.getInt("${symbol}.Leverage")
             minLot = plugin.config.getDouble("${symbol}.MinLot")
             maxLot = plugin.config.getDouble("${symbol}.MaxLot")
-            pipsAmount = plugin.config.getDouble("${symbol}.PipsAmount")
-            spread = pipsToPrice(plugin.config.getDouble("${symbol}.SpreadPips"),symbol)
+            pipsAmount = plugin.config.getInt("${symbol}.PipsAmount")
+            spread = plugin.config.getDouble("${symbol}.SpreadPips")
             contractSize = plugin.config.getInt("${symbol}.ContractSize")
 
             Bukkit.getLogger().info("==========${symbol}==========")
@@ -67,8 +68,7 @@ object Forex {
             Bukkit.getLogger().info("MinLot:${minLot}")
             Bukkit.getLogger().info("MaxLot:${maxLot}")
             Bukkit.getLogger().info("PipsAmount:${pipsAmount}")
-            Bukkit.getLogger().info("SpreadPrice:${spread}")
-            Bukkit.getLogger().info("SpreadPips:${priceToPips(spread,symbol)}")
+            Bukkit.getLogger().info("SpreadPips:${spread}")
             Bukkit.getLogger().info("ContractSize:${contractSize}")
         }
     }
@@ -81,9 +81,8 @@ object Forex {
 
         Thread{
             Thread.sleep(1000)
-            val symbolStringList = Price.symbolList()
 
-            for (symbol in symbolStringList){
+            for (symbol in symbolList){
                 symbols[symbol] = Symbol(symbol)
             }
         }.start()
@@ -97,12 +96,10 @@ object Forex {
 
         symbols.clear()
 
-
         Thread{
             Thread.sleep(1000)
-            val symbolStringList = Price.symbolList()
 
-            for (symbol in symbolStringList){
+            for (symbol in symbolList){
                 symbols[symbol] = Symbol(symbol)
             }
         }.start()
@@ -114,6 +111,7 @@ object Forex {
     fun loadConfig(){
         plugin.reloadConfig()
 
+        symbolList = plugin.config.getStringList("SymbolList")//使う銘柄のリスト
         Price.url = plugin.config.getString("PriceURL")?:""
         lossCutPercent = plugin.config.getDouble("LossCutPercent")
         MarketStatus.entry = plugin.config.getBoolean("Status.Entry")
@@ -191,7 +189,7 @@ object Forex {
     fun profit(position:Position,price: Double?=null): Double {
 
         val symbol = position.symbol
-        val isCrossJPY = position.symbol.contains("JPY")
+        val isCrossJPY = Price.isCrossJPY(symbol)
 
         if (position.buy) {
             val bid = price ?: Price.bid(symbol)
@@ -231,14 +229,18 @@ object Forex {
 
     //持てる最大ロットを取得(少数第三以下は切り捨て
     fun getMaxLots(uuid: UUID, price: Double, list: MutableList<Position>, symbol: String):Double{
-        val margin = margin(uuid, list)
+
+        val isCrossJPY = Price.isCrossJPY(symbol)
+        val margin = if (isCrossJPY) margin(uuid, list) else margin(uuid, list)/Price.price("USDJPY")
         val data = symbols[symbol]!!
         return floor(margin * data.leverage  /(price* data.contractSize)*100)/100.0
     }
 
     private fun lotsToMan10Money(lots:Double, price: Double,symbol: String):Double{
+        val isCrossJPY = Price.isCrossJPY(symbol)
         val data = symbols[symbol]!!
-        return floor(price*lots* data.contractSize)
+        val money = if (isCrossJPY) floor(price*lots* data.contractSize) else floor(price*lots* data.contractSize*Price.price("USDJPY"))
+        return money
     }
 
     private fun priceToPips(price: Double,symbol: String): Double {
@@ -246,7 +248,7 @@ object Forex {
         return price*data.pipsAmount
     }
 
-    private fun pipsToPrice(pips:Double,symbol: String):Double{
+    fun pipsToPrice(pips:Double,symbol: String):Double{
         val data = symbols[symbol]!!
         return pips/data.pipsAmount
     }

@@ -25,6 +25,7 @@ import red.man10.man10forex.forex.Forex.prefix
 import red.man10.man10forex.forex.Forex.profit
 import red.man10.man10forex.forex.Forex.setSL
 import red.man10.man10forex.forex.Forex.setTP
+import red.man10.man10forex.forex.Forex.symbols
 import red.man10.man10forex.util.MySQLManager
 import red.man10.man10forex.util.Price
 import red.man10.man10forex.util.Utility.format
@@ -113,10 +114,10 @@ object Command :CommandExecutor{
                 val symbol = args[2]
                 val lots = args[3].toDoubleOrNull()
 
-                if (!Price.symbolList().contains(symbol)){
-                    sender.sendMessage("${prefix}存在しない銘柄です")
-                    return true
-                }
+//                if (!Price.symbolList().contains(symbol)){
+//                    sender.sendMessage("${prefix}存在しない銘柄です")
+//                    return true
+//                }
 
                 val data = Forex.symbols[symbol]!!
 
@@ -147,7 +148,7 @@ object Command :CommandExecutor{
                     sender.sendMessage("${prefix}/mfx buy <銘柄> <ロット数>")
                     return false
                 }
-                sender.performCommand("mfx entry ${args[1]} b ${args[2]}")
+                sender.performCommand("mfx entry b ${args[1]} ${args[2]}")
             }
 
             "sell" ->{
@@ -157,7 +158,7 @@ object Command :CommandExecutor{
                     sender.sendMessage("${prefix}/mfx sell <銘柄> <ロット数>")
                     return false
                 }
-                sender.performCommand("mfx entry ${args[1]} s ${args[2]}")
+                sender.performCommand("mfx entry s ${args[1]} ${args[2]}")
             }
 
             "tp" ->{
@@ -412,7 +413,9 @@ object Command :CommandExecutor{
                 func.function(sql)
 
             }catch (e:java.lang.Exception){
-                Bukkit.getLogger().info(e.message)
+                for (trace in e.stackTrace){
+                    Bukkit.getLogger().info("§e§l${trace}")
+                }
             }
         }
     }
@@ -513,14 +516,16 @@ object Command :CommandExecutor{
 
         val prefix = text(prefix)
 
-        for (symbol in Price.symbolList()){
+        for (symbol in Forex.symbolList){
+
+            val digits = symbols[symbol]?.pipsAmount.toString().length
 
             val symbolText = text("§e§l${symbol} ")
-            val sellButton = text("§c§l§n${isAllowed(Forex.MarketStatus.entry)}[売(${format(Price.ask(symbol),3)})]")
+            val sellButton = text("§c§l§n${isAllowed(Forex.MarketStatus.entry)}[売(${format(Price.ask(symbol),digits)})]")
                 .clickEvent(ClickEvent.suggestCommand("/mfx sell $symbol "))
                 .hoverEvent(HoverEvent.showText(text("§c現在価格より下回ったら利益がでます\n§c/mfx sell $symbol <ロット数>(0.01〜1000)")))
             val maxLot = text(" §f§l最大${format(getMaxLots(p.uniqueId,Price.price(symbol),list,symbol),2)}ロット ")
-            val buyButton = text("§a§l§n${isAllowed(Forex.MarketStatus.entry)}[買(${format(Price.bid(symbol),3)})]")
+            val buyButton = text("§a§l§n${isAllowed(Forex.MarketStatus.entry)}[買(${format(Price.bid(symbol),digits)})]")
                 .clickEvent(ClickEvent.suggestCommand("/mfx buy $symbol "))
                 .hoverEvent(HoverEvent.showText(text("§a現在価格より上回ったら利益がでます\n§a/mfx buy $symbol <ロット数>(0.01〜1000)")))
 

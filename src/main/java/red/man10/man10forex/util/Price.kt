@@ -15,7 +15,6 @@ object Price : CommandExecutor{
     var url = "http://taro:824/api/price"
 
     private val symbolMap = ConcurrentHashMap<String,PriceData>()
-    private val symbolList = mutableListOf<String>()
 
     var finalDate = ""
 
@@ -67,8 +66,8 @@ object Price : CommandExecutor{
         return symbolMap[symbol]?.ask?:-1.0
     }
 
-    fun symbolList():List<String>{
-        return symbolList
+    fun isCrossJPY(symbol: String):Boolean{
+        return symbol.contains("JPY")
     }
 
     data class DeserializedData(
@@ -122,12 +121,8 @@ object Price : CommandExecutor{
 
                 var checkedDate = false//時刻確認フラグ
 
-                symbolList.clear()
-
                 for (obj in jsonObj){
                     val symbol = obj.symbol
-
-                    symbolList.add(symbol)
 
 //                    //前回と取得時刻が変わらなかった場合はエラー
 //                    if (finalDate == obj.time && !checkedDate){
@@ -144,8 +139,8 @@ object Price : CommandExecutor{
                     val sData = Forex.symbols[symbol]?:continue
 
                     val price = (obj.bid+obj.ask)/2.0
-                    val ask = price+(sData.spread/2.0)
-                    val bid = price-(sData.spread/2.0)
+                    val ask = price+(Forex.pipsToPrice(sData.spread,symbol)/2.0)
+                    val bid = price-(Forex.pipsToPrice(sData.spread,symbol)/2.0)
 
                     val data = PriceData(symbol,bid,ask,price)
 
