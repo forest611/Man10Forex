@@ -9,47 +9,119 @@ import red.man10.man10forex.util.Price
 import red.man10.man10forex.util.Utility
 import java.util.*
 import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.floor
 
 object Forex {
 
     const val prefix = "§f§l[§c§lM§a§lForex§f§l]"
-
-    private var leverage = 100
-    private const val symbol = "USDJPY"
-    var minLot : Double = 0.01
-    var maxLot : Double = 1000.0
-    var lossCutPercent : Double = 20.0
-    var contractSize : Int = 100000
-    var spread : Double = 0.02  //スプレッド(Price)
-
     private val jobQueue = ArrayBlockingQueue<Job>(32768,true)
     private var positionThread = Thread{ positionThread() }
     private var queueThread = Thread{ queueThread() }
 
+    var lossCutPercent : Double = 20.0
+
+    var symbols = ConcurrentHashMap<String,Symbol>()
+
+
+    //シンボルデータ
+    class Symbol(private val symbol:String){
+
+        var leverage = 100
+        var minLot : Double = 0.01
+        var maxLot : Double = 1000.0
+        var contractSize : Int = 100000
+        var spread : Double = 0.02  //スプレッド(Price)
+        var pipsAmount : Double = 100.0 //Priceにいくつ書けるとPipsになるか
+
+        init {
+            loadConfig()
+        }
+
+        private fun loadConfig(){
+            plugin.reloadConfig()
+
+            if (plugin.config.get(symbol) == null){
+                plugin.config.set("${symbol}.Leverage",leverage)
+                plugin.config.set("${symbol}.MinLot",minLot)
+                plugin.config.set("${symbol}.MaxLot",maxLot)
+                plugin.config.set("${symbol}.PipsAmount",pipsAmount)
+                plugin.config.set("${symbol}.SpreadPips",spread)
+                plugin.config.set("${symbol}.ContractSize",contractSize)
+
+                plugin.saveConfig()
+
+                Bukkit.getLogger().info("${symbol}の初期化をしました")
+                return
+            }
+
+            leverage = plugin.config.getInt("${symbol}.Leverage")
+            minLot = plugin.config.getDouble("${symbol}.MinLot")
+            maxLot = plugin.config.getDouble("${symbol}.MaxLot")
+            pipsAmount = plugin.config.getDouble("${symbol}.PipsAmount")
+            spread = pipsToPrice(plugin.config.getDouble("${symbol}.SpreadPips"),symbol)
+            contractSize = plugin.config.getInt("${symbol}.ContractSize")
+
+            Bukkit.getLogger().info("==========${symbol}==========")
+            Bukkit.getLogger().info("Leverage:${leverage}")
+            Bukkit.getLogger().info("MinLot:${minLot}")
+            Bukkit.getLogger().info("MaxLot:${maxLot}")
+            Bukkit.getLogger().info("PipsAmount:${pipsAmount}")
+            Bukkit.getLogger().info("SpreadPrice:${spread}")
+            Bukkit.getLogger().info("SpreadPips:${priceToPips(spread,symbol)}")
+            Bukkit.getLogger().info("ContractSize:${contractSize}")
+        }
+    }
+
+    //static
+
     init {
+
+        symbols.clear()
+
+        Thread{
+            Thread.sleep(1000)
+            val symbolStringList = Price.symbolList()
+
+            for (symbol in symbolStringList){
+                symbols[symbol] = Symbol(symbol)
+            }
+        }.start()
+
         runThread()
     }
 
+    fun reload(){
+
+        loadConfig()
+
+        symbols.clear()
+
+
+        Thread{
+            Thread.sleep(1000)
+            val symbolStringList = Price.symbolList()
+
+            for (symbol in symbolStringList){
+                symbols[symbol] = Symbol(symbol)
+            }
+        }.start()
+
+
+        runThread()
+    }
 
     fun loadConfig(){
         plugin.reloadConfig()
 
-        leverage = plugin.config.getInt("Leverage")
-        minLot = plugin.config.getDouble("MinLot")
-        maxLot = plugin.config.getDouble("MaxLot")
+        Price.url = plugin.config.getString("PriceURL")?:""
         lossCutPercent = plugin.config.getDouble("LossCutPercent")
-        spread = pipsToPrice(plugin.config.getDouble("SpreadPips"))
-        contractSize = plugin.config.getInt("UnitSize")
-        Price.url = plugin.config.getString("PriceURL","http://taro:824/api/price")?:"http://taro:824/api/price"
-
         MarketStatus.entry = plugin.config.getBoolean("Status.Entry")
         MarketStatus.exit = plugin.config.getBoolean("Status.Exit")
         MarketStatus.withdraw = plugin.config.getBoolean("Status.Withdraw")
         MarketStatus.deposit = plugin.config.getBoolean("Status.Deposit")
         MarketStatus.tpsl = plugin.config.getBoolean("Status.TPSL")
         MarketStatus.lossCut = plugin.config.getBoolean("Status.LossCut")
-
     }
 
     fun setStatus(){
@@ -64,6 +136,213 @@ object Forex {
         plugin.saveConfig()
     }
 
+    fun entry(p:Player,lots: Double,isBuy:Boolean,symbol: String){
+
+        val job = Job {sql->
+
+            val id = UUID.randomUUID()
+            val price = if (isBuy) Price.ask(symbol) else Price.bid(symbol)
+            val positions = asyncGetUserPositions(p.uniqueId,sql)
+            val maxLots = getMaxLots(p.uniqueId,price,positions,symbol)
+            val data = symbols[symbol]
+
+            if (data==null){
+                p.sendMessage("${prefix}存在しない銘柄です")
+                return@Job
+            }
+
+            //ロット数が証拠金より多い場合
+            if (lots> maxLots){
+                if (lots< data.minLot){
+                    p.sendMessage("${prefix}残高があまりにも少ないため、エントリーができません")
+                    return@Job
+                }
+
+                p.sendMessage("${prefix}あなたがエントリーできる最大ロット数は${Utility.format(maxLots,2)}までです！")
+                return@Job
+            }
+
+            //新規ポジションを定義
+            val position = Position(id,p.uniqueId,lots,symbol,price,isBuy,!isBuy,0.0,0.0)
+
+            sql.execute("INSERT INTO position_table (position_id, player, uuid, lots, symbol, buy, sell, `exit`, entry_price, exit_price, profit, entry_date, exit_date) " +
+                    "VALUES ('" +
+                    "${position.positionID}', " +
+                    "'${p.name}', " +
+                    "'${p.uniqueId}', " +
+                    "${position.lots}, " +
+                    "'${symbol}', " +
+                    "${if (position.buy) 1 else 0}, " +
+                    "${if (position.sell) 1 else 0}, " +
+                    "DEFAULT, " +
+                    "${position.entryPrice}, " +
+                    "null, " +
+                    "null, " +
+                    "DEFAULT, " +
+                    "null);")
+
+            p.sendMessage("${prefix}エントリーを受け付けました！価格:§d§l${Utility.priceFormat(price)}")
+        }
+
+        jobQueue.add(job)
+    }
+
+    //ポジごとの含み損益を見る
+    fun profit(position:Position,price: Double?=null): Double {
+
+        val symbol = position.symbol
+        val isCrossJPY = position.symbol.contains("JPY")
+
+        if (position.buy) {
+            val bid = price ?: Price.bid(symbol)
+            val entryMoney = lotsToMan10Money(position.lots, position.entryPrice, symbol)
+            val nowMoney = lotsToMan10Money(position.lots, bid, symbol)
+            return if (isCrossJPY) nowMoney - entryMoney else (nowMoney - entryMoney) * Price.bid("USDJPY")
+        }
+
+        if (position.sell){
+            val ask = price?:Price.ask(symbol)
+            val entryMoney = lotsToMan10Money(position.lots,position.entryPrice,symbol)
+            val nowMoney = lotsToMan10Money(position.lots,ask,symbol)
+            return if (isCrossJPY) entryMoney-nowMoney else (entryMoney-nowMoney) * Price.bid("USDJPY")
+        }
+
+        return 0.0
+    }
+
+
+    //ポジションの現在価格との差(Pips)
+    fun diffPips(position: Position):Double{
+
+        val symbol = position.symbol
+
+        if (position.buy){
+            val bid = Price.bid(symbol)
+            return priceToPips(bid-position.entryPrice,symbol)
+        }
+
+        if (position.sell){
+            val ask = Price.ask(symbol)
+            return priceToPips(position.entryPrice-ask,symbol)
+        }
+
+        return 0.0
+    }
+
+    //持てる最大ロットを取得(少数第三以下は切り捨て
+    fun getMaxLots(uuid: UUID, price: Double, list: MutableList<Position>, symbol: String):Double{
+        val margin = margin(uuid, list)
+        val data = symbols[symbol]!!
+        return floor(margin * data.leverage  /(price* data.contractSize)*100)/100.0
+    }
+
+    private fun lotsToMan10Money(lots:Double, price: Double,symbol: String):Double{
+        val data = symbols[symbol]!!
+        return floor(price*lots* data.contractSize)
+    }
+
+    private fun priceToPips(price: Double,symbol: String): Double {
+        val data = symbols[symbol]!!
+        return price*data.pipsAmount
+    }
+
+    private fun pipsToPrice(pips:Double,symbol: String):Double{
+        val data = symbols[symbol]!!
+        return pips/data.pipsAmount
+    }
+
+    fun setTP(p:Player,pos:UUID,tp: Double){
+
+        val job = Job {sql->
+            val list = asyncGetUserPositions(p.uniqueId, sql)
+            var position : Position? = null
+
+            list.forEach {
+                if (it.positionID == pos){
+                    position = it
+                    return@forEach
+                }
+            }
+
+            if (position == null)return@Job
+
+            if (position!!.buy){
+                val bid = Price.bid(position!!.symbol)
+                //tpが現在値より低い時は未設定に
+                position!!.tp = if (bid>tp){ 0.0 } else tp
+
+                if (position!!.tp == 0.0){
+                    p.sendMessage("${prefix}TPは現在価格(${Utility.priceFormat(bid)})より高く設定してください")
+                }else{
+                    p.sendMessage("${prefix}設定完了")
+                }
+            }
+
+            if (position!!.sell){
+                val ask = Price.ask(position!!.symbol)
+                position!!.tp = if (ask<tp){ 0.0 } else tp
+
+                if (position!!.tp == 0.0){
+                    p.sendMessage("${prefix}TPは現在価格(${Utility.priceFormat(ask)})より低く設定してください")
+                }else{
+                    p.sendMessage("${prefix}設定完了")
+                }
+            }
+
+            sql.execute("UPDATE position_table SET tp_price = ${position!!.tp} WHERE position_id ='${pos}'")
+        }
+
+        jobQueue.add(job)
+    }
+
+
+    fun setSL(p:Player,pos:UUID,sl: Double){
+
+        val job = Job {sql->
+            val list = asyncGetUserPositions(p.uniqueId, sql)
+            var position : Position? = null
+
+            list.forEach {
+                if (it.positionID == pos){
+                    position = it
+                    return@forEach
+                }
+            }
+
+            if (position == null)return@Job
+
+            if (position!!.buy){
+                val bid = Price.bid(position!!.symbol)
+                //slが現在値より高い時は未設定に
+                position!!.sl = if (bid<sl){ 0.0 } else sl
+
+                if (position!!.sl == 0.0){
+                    p.sendMessage("${prefix}SLは現在価格(${Utility.priceFormat(bid)})より低く設定してください")
+                }else{
+                    p.sendMessage("${prefix}設定完了")
+                }
+            }
+
+            if (position!!.sell){
+                val ask = Price.ask(position!!.symbol)
+                position!!.sl = if (ask>sl){ 0.0 } else sl
+
+                if (position!!.sl == 0.0){
+                    p.sendMessage("${prefix}SLは現在価格(${Utility.priceFormat(ask)})より高く設定してください")
+                }else{
+                    p.sendMessage("${prefix}設定完了")
+                }
+            }
+
+            sql.execute("UPDATE position_table SET sl_price = ${position!!.sl} WHERE position_id ='${pos}'")
+        }
+
+        jobQueue.add(job)
+    }
+
+    fun exit(uuid: UUID,pos:UUID,isLossCut:Boolean,exitPrice: Double? = null){
+        jobQueue.add(Job {asyncExit(uuid, pos, isLossCut, it, exitPrice) })
+    }
     private fun asyncExit(uuid: UUID, pos:UUID, isLossCut:Boolean, sql: MySQLManager, exitPrice: Double? = null){
 
         val list = asyncGetUserPositions(uuid, sql)
@@ -77,6 +356,8 @@ object Forex {
         }
 
         if (position==null)return
+
+        val symbol = position!!.symbol
 
         val price = exitPrice ?: if (position!!.buy) Price.bid(symbol) else Price.ask(symbol)
         val profit = profit(position!!,price)
@@ -120,6 +401,7 @@ object Forex {
                 UUID.fromString(rs.getString("position_id")),
                 UUID.fromString(rs.getString("uuid")),
                 rs.getDouble("lots"),
+                rs.getString("symbol"),
                 rs.getDouble("entry_price"),
                 rs.getInt("buy")==1,
                 rs.getInt("sell")==1,
@@ -136,192 +418,21 @@ object Forex {
         return list
     }
 
-    fun entry(p:Player,lots: Double,isBuy:Boolean){
-
-        val job = Job {sql->
-
-            val id = UUID.randomUUID()
-            val price = if (isBuy) Price.ask(symbol) else Price.bid(symbol)
-
-            val positions = asyncGetUserPositions(p.uniqueId,sql)
-
-            val maxLots = getMaxLots(p.uniqueId,price,positions)
-
-            //ロット数が証拠金より多い場合
-            if (lots> maxLots){
-                if (lots< minLot){
-                    p.sendMessage("${prefix}残高があまりにも少ないため、エントリーができません")
-                    return@Job
-                }
-
-                p.sendMessage("${prefix}あなたがエントリーできる最大ロット数は${Utility.format(maxLots,2)}までです！")
-                return@Job
-            }
-
-            //新規ポジションを定義
-            val position = Position(id,p.uniqueId,lots,price,isBuy,!isBuy,0.0,0.0)
-
-            sql.execute("INSERT INTO position_table (position_id, player, uuid, lots, buy, sell, `exit`, entry_price, exit_price, profit, entry_date, exit_date) " +
-                    "VALUES ('" +
-                    "${position.positionID}', " +
-                    "'${p.name}', " +
-                    "'${p.uniqueId}', " +
-                    "${position.lots}, " +
-                    "${if (position.buy) 1 else 0}, " +
-                    "${if (position.sell) 1 else 0}, " +
-                    "DEFAULT, " +
-                    "${position.entryPrice}, " +
-                    "null, " +
-                    "null, " +
-                    "DEFAULT, " +
-                    "null);")
-
-            p.sendMessage("${prefix}エントリーを受け付けました！価格:§d§l${Utility.priceFormat(price)}")
-        }
-
-        jobQueue.add(job)
-    }
-
-    fun exit(uuid: UUID,pos:UUID,isLossCut:Boolean,exitPrice: Double? = null){
-        jobQueue.add(Job {asyncExit(uuid, pos, isLossCut, it, exitPrice) })
-    }
-
-    fun setTP(p:Player,pos:UUID,tp: Double){
-
-        val job = Job {sql->
-            val list = asyncGetUserPositions(p.uniqueId, sql)
-            var position : Position? = null
-
-            list.forEach {
-                if (it.positionID == pos){
-                    position = it
-                    return@forEach
-                }
-            }
-
-            if (position == null)return@Job
-
-            if (position!!.buy){
-                val bid = Price.bid(symbol)
-                //tpが現在値より低い時は未設定に
-                position!!.tp = if (bid>tp){ 0.0 } else tp
-
-                if (position!!.tp == 0.0){
-                    p.sendMessage("${prefix}TPは現在価格(${Utility.priceFormat(bid)})より高く設定してください")
-                }else{
-                    p.sendMessage("${prefix}設定完了")
-                }
-            }
-
-            if (position!!.sell){
-                val ask = Price.ask(symbol)
-                position!!.tp = if (ask<tp){ 0.0 } else tp
-
-                if (position!!.tp == 0.0){
-                    p.sendMessage("${prefix}TPは現在価格(${Utility.priceFormat(ask)})より低く設定してください")
-                }else{
-                    p.sendMessage("${prefix}設定完了")
-                }
-            }
-
-            sql.execute("UPDATE position_table SET tp_price = ${position!!.tp} WHERE position_id ='${pos}'")
-        }
-
-        jobQueue.add(job)
-    }
-
-
-    fun setSL(p:Player,pos:UUID,sl: Double){
-
-        val job = Job {sql->
-            val list = asyncGetUserPositions(p.uniqueId, sql)
-            var position : Position? = null
-
-            list.forEach {
-                if (it.positionID == pos){
-                    position = it
-                    return@forEach
-                }
-            }
-
-            if (position == null)return@Job
-
-            if (position!!.buy){
-                val bid = Price.bid(symbol)
-                //slが現在値より高い時は未設定に
-                position!!.sl = if (bid<sl){ 0.0 } else sl
-
-                if (position!!.sl == 0.0){
-                    p.sendMessage("${prefix}SLは現在価格(${Utility.priceFormat(bid)})より低く設定してください")
-                }else{
-                    p.sendMessage("${prefix}設定完了")
-                }
-            }
-
-            if (position!!.sell){
-                val ask = Price.ask(symbol)
-                position!!.sl = if (ask>sl){ 0.0 } else sl
-
-                if (position!!.sl == 0.0){
-                    p.sendMessage("${prefix}SLは現在価格(${Utility.priceFormat(ask)})より高く設定してください")
-                }else{
-                    p.sendMessage("${prefix}設定完了")
-                }
-            }
-
-            sql.execute("UPDATE position_table SET sl_price = ${position!!.sl} WHERE position_id ='${pos}'")
-        }
-
-        jobQueue.add(job)
-    }
-
-    fun profit(position:Position,price: Double?=null): Double {
-
-        if (position.buy){
-            val bid = price?:Price.bid(symbol)
-            val entryMoney = lotsToMan10Money(position.lots,position.entryPrice)
-            val nowMoney = lotsToMan10Money(position.lots,bid)
-            return nowMoney-entryMoney
-        }
-
-        if (position.sell){
-            val ask = price?:Price.ask(symbol)
-            val entryMoney = lotsToMan10Money(position.lots,position.entryPrice)
-            val nowMoney = lotsToMan10Money(position.lots,ask)
-            return entryMoney-nowMoney
-        }
-
-        return 0.0
-    }
-
-
-    //ポジションの現在価格との差(Pips)
-    fun diffPips(position: Position):Double{
-        if (position.buy){
-            val bid = Price.bid(symbol)
-            return priceToPips(bid-position.entryPrice)
-        }
-
-        if (position.sell){
-            val ask = Price.ask(symbol)
-            return priceToPips(position.entryPrice-ask)
-        }
-
-        return 0.0
-    }
-
     //全ポジの含み益
     fun allProfit(list:List<Position>):Double {
         var profit = 0.0
-        list.forEach { profit+= profit(it) }
-
+        list.forEach { profit +=  profit(it)}
         return profit
     }
 
     //必要証拠金
-    fun marginRequirement(list:List<Position>):Double{
+    private fun marginRequirement(list:List<Position>):Double{
         var margin = 0.0
-        list.forEach { margin+= it.lots* contractSize/ leverage*it.entryPrice }
+        list.forEach {
+            val contractSize = symbols[it.symbol]?.contractSize?:0
+            val leverage = symbols[it.symbol]?.leverage?:0
+            margin+= it.lots* contractSize/ leverage*it.entryPrice
+        }
         return margin
     }
 
@@ -387,7 +498,7 @@ object Forex {
 
             list.forEach {
                 if (it.buy){
-                    val bid = Price.bid(symbol)
+                    val bid = Price.bid(it.symbol)
 
                     if (it.tp!= 0.0 && bid>it.tp){
                         asyncExit(uuid,it.positionID,false,sql,it.tp)
@@ -399,7 +510,7 @@ object Forex {
                 }
 
                 if (it.sell){
-                    val ask = Price.ask(symbol)
+                    val ask = Price.ask(it.symbol)
 
                     if (it.tp!= 0.0 && ask<it.tp){
                         asyncExit(uuid,it.positionID,false,sql,it.tp)
@@ -418,27 +529,6 @@ object Forex {
     private fun checkPending(uuid: UUID){
 
     }
-
-
-    //持てる最大ロットを取得(少数第三以下は切り捨て
-    fun getMaxLots(uuid: UUID, price: Double,list:MutableList<Position>):Double{
-        val margin = margin(uuid, list)
-        return floor(margin * leverage  /(price* contractSize)*100)/100.0
-    }
-
-    private fun lotsToMan10Money(lots:Double, price: Double):Double{
-        return floor(price*lots* contractSize)
-    }
-
-    //ドル円のみ対応
-    private fun priceToPips(price: Double): Double {
-        return price*100.0
-    }
-
-    private fun pipsToPrice(pips:Double):Double{
-        return pips/100.0
-    }
-
 
     //####################################管理スレッド##################################
 
@@ -524,19 +614,6 @@ object Forex {
         }
     }
 
-    fun showQueueStatus(p:Player){
-        p.sendMessage("${prefix}QueueSize:${jobQueue.size}")
-        p.sendMessage("${prefix}Alive:${queueThread.isAlive}")
-        p.sendMessage("${prefix}State:${queueThread.state.name}")
-        p.sendMessage("${prefix}ToString:${queueThread}")
-        p.sendMessage("${prefix}StackTrace:${queueThread.stackTrace.size}")
-        queueThread.stackTrace.forEach {
-            p.sendMessage("${prefix}${it.methodName}(${it.lineNumber})")
-        }
-
-        ForexBank.showThreadStatus(p)
-    }
-
 
     private fun interface Job{
         fun job(sql:MySQLManager)
@@ -547,6 +624,7 @@ object Forex {
         val positionID:UUID,
         val uuid: UUID,
         val lots:Double,
+        val symbol: String,
         val entryPrice:Double,
         val buy:Boolean,
         val sell:Boolean,

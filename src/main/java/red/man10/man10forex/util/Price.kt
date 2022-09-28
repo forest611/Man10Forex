@@ -1,8 +1,6 @@
 package red.man10.man10forex.util
 
 import com.google.gson.Gson
-import okhttp3.Cache
-import okhttp3.CacheControl
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.bukkit.command.Command
@@ -11,13 +9,13 @@ import org.bukkit.command.CommandSender
 import red.man10.man10forex.forex.Forex
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.TimeUnit
 
 object Price : CommandExecutor{
 
     var url = "http://taro:824/api/price"
 
-    private val currencyMap = ConcurrentHashMap<String,PriceData>()
+    private val symbolMap = ConcurrentHashMap<String,PriceData>()
+    private val symbolList = mutableListOf<String>()
 
     var finalDate = ""
 
@@ -58,15 +56,19 @@ object Price : CommandExecutor{
 
     //仲直取得
     fun price(symbol: String): Double {
-        return currencyMap[symbol]?.price?:-1.0
+        return symbolMap[symbol]?.price?:-1.0
     }
 
     fun bid(symbol: String): Double {
-        return currencyMap[symbol]?.bid?:-1.0
+        return symbolMap[symbol]?.bid?:-1.0
     }
 
     fun ask(symbol: String): Double {
-        return currencyMap[symbol]?.ask?:-1.0
+        return symbolMap[symbol]?.ask?:-1.0
+    }
+
+    fun symbolList():List<String>{
+        return symbolList
     }
 
     data class DeserializedData(
@@ -120,28 +122,34 @@ object Price : CommandExecutor{
 
                 var checkedDate = false//時刻確認フラグ
 
+                symbolList.clear()
+
                 for (obj in jsonObj){
                     val symbol = obj.symbol
 
-                    //前回と取得時刻が変わらなかった場合はエラー
-                    if (finalDate == obj.time && !checkedDate){
-                        dateCount++
-                        if (dateCount>=20){ error = true }
-                        continue@Main
-                    }
+                    symbolList.add(symbol)
+
+//                    //前回と取得時刻が変わらなかった場合はエラー
+//                    if (finalDate == obj.time && !checkedDate){
+//                        dateCount++
+//                        if (dateCount>=20){ error = true }
+//                        continue@Main
+//                    }
 
                     checkedDate = true
                     dateCount = 0
 
                     finalDate = obj.time
 
+                    val sData = Forex.symbols[symbol]?:continue
+
                     val price = (obj.bid+obj.ask)/2.0
-                    val ask = price+(Forex.spread/2.0)
-                    val bid = price-(Forex.spread/2.0)
+                    val ask = price+(sData.spread/2.0)
+                    val bid = price-(sData.spread/2.0)
 
                     val data = PriceData(symbol,bid,ask,price)
 
-                    currencyMap[symbol] = data
+                    symbolMap[symbol] = data
                 }
 
                 error = false
@@ -173,7 +181,7 @@ object Price : CommandExecutor{
             "price" ->{
 
                 if (symbol=="all"){
-                    currencyMap.keys.forEach { sender.sendMessage("§d§l現在価格(${it})....§f§l${String.format("%,.3f",price(it))}") }
+                    symbolMap.keys.forEach { sender.sendMessage("§d§l現在価格(${it})....§f§l${String.format("%,.3f",price(it))}") }
                 }else{
                     sender.sendMessage("§d§l現在価格....§f§l${String.format("%,.3f",price(symbol))}")
                 }
@@ -181,7 +189,7 @@ object Price : CommandExecutor{
 
             "bid" ->{
                 if (symbol=="all"){
-                    currencyMap.keys.forEach { sender.sendMessage("§c§l現在価格(Bid)(${it})....${String.format("%,.3f",bid(it))}") }
+                    symbolMap.keys.forEach { sender.sendMessage("§c§l現在価格(Bid)(${it})....${String.format("%,.3f",bid(it))}") }
                 }else{
                     sender.sendMessage("§c§l現在価格(Bid)....${String.format("%,.3f",bid(symbol))}")
                 }
@@ -189,7 +197,7 @@ object Price : CommandExecutor{
 
             "ask" ->{
                 if (symbol=="all"){
-                    currencyMap.keys.forEach { sender.sendMessage("§b§l現在価格(Ask)(${it})....${String.format("%,.3f",ask(it))}") }
+                    symbolMap.keys.forEach { sender.sendMessage("§b§l現在価格(Ask)(${it})....${String.format("%,.3f",ask(it))}") }
                 }else{
                     sender.sendMessage("§b§l現在価格(Ask)....${String.format("%,.3f",ask(symbol))}")
                 }
