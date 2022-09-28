@@ -189,20 +189,19 @@ object Forex {
     fun profit(position:Position,price: Double?=null): Double {
 
         val symbol = position.symbol
-        val isCrossJPY = Price.isCrossJPY(symbol)
 
         if (position.buy) {
             val bid = price ?: Price.bid(symbol)
             val entryMoney = lotsToMan10Money(position.lots, position.entryPrice, symbol)
             val nowMoney = lotsToMan10Money(position.lots, bid, symbol)
-            return if (isCrossJPY) nowMoney - entryMoney else (nowMoney - entryMoney) * Price.bid("USDJPY")
+            return  nowMoney - entryMoney
         }
 
         if (position.sell){
             val ask = price?:Price.ask(symbol)
             val entryMoney = lotsToMan10Money(position.lots,position.entryPrice,symbol)
             val nowMoney = lotsToMan10Money(position.lots,ask,symbol)
-            return if (isCrossJPY) entryMoney-nowMoney else (entryMoney-nowMoney) * Price.bid("USDJPY")
+            return entryMoney-nowMoney
         }
 
         return 0.0

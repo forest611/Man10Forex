@@ -467,6 +467,7 @@ object Command :CommandExecutor{
 
             val profit = profit(it)
 
+            val symbolText = "§e§l${it.symbol} "
             val lots = (if (it.buy) "§a§l買" else "§c§l売") + " ${it.lots}ロット "
             val openPrice = "O:${priceFormat(it.entryPrice)} "
             val profitText = if (profit>0.0) "§b§l${moneyFormat(profit)}円" else if(profit<0.0) "§4§l${moneyFormat(profit)}円" else "§f§l${moneyFormat(profit)}円"
@@ -479,7 +480,7 @@ object Command :CommandExecutor{
                     "§7オープン価格:§l${priceFormat(it.entryPrice)}" +
                     "§7損益:${profit}${diff}"
 
-            val positionData = text(lots+openPrice+profitText+diff)
+            val positionData = text(symbolText+lots+openPrice+profitText+diff)
                 .hoverEvent(HoverEvent.showText(text(positionDataText)))
 
             val exitText = "§e§n${isAllowed(Forex.MarketStatus.exit)}[決済]"
