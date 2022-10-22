@@ -551,7 +551,7 @@ object Command :CommandExecutor{
 
     private fun showHistory(p:Player, sql:MySQLManager, page:Int = 0){
 
-        val rs = sql.query("select * from position_table where uuid='${p.uniqueId}' and `exit`=1 order by exit_date;")?:return
+        val rs = sql.query("select * from position_table where uuid='${p.uniqueId}' and `exit`=1 order by exit_date desc;")?:return
 
         val list = mutableListOf<PositionHistory>()
 
@@ -598,7 +598,7 @@ object Command :CommandExecutor{
             p.sendMessage(msg)
         }
 
-        p.sendMessage("${prefix}§a§lトータル損益:${if (totalProfit>=0) "§b§l" else "§c§l"} ${format(totalProfit,0)}")
+        p.sendMessage("${prefix}§a§lトータル損益:${if (totalProfit>=0) "§b§l" else "§c§l"} ${format(totalProfit,0)}円")
 
         var prefix = text(prefix)
         val previous = text("§f§l§n[前のページ]").clickEvent(ClickEvent.runCommand("/mfx history ${page-1}"))
