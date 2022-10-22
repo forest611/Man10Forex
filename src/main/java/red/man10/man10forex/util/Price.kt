@@ -94,7 +94,7 @@ object Price : CommandExecutor{
 
             Thread.sleep(100)
 
-            if (!isActiveTime())continue@Main
+            //if (!isActiveTime())continue@Main
 
             try {
 

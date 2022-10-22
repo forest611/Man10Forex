@@ -28,6 +28,7 @@ import red.man10.man10forex.forex.Forex.setTP
 import red.man10.man10forex.forex.Forex.symbols
 import red.man10.man10forex.util.MySQLManager
 import red.man10.man10forex.util.Price
+import red.man10.man10forex.util.Utility
 import red.man10.man10forex.util.Utility.format
 import red.man10.man10forex.util.Utility.moneyFormat
 import red.man10.man10forex.util.Utility.priceFormat
@@ -139,6 +140,15 @@ object Command :CommandExecutor{
             "board" ->{
                 if (sender !is Player)return true
                 showBalanceQueue.add(Func { showPriceBoard(sender,it) })
+            }
+
+            "history" ->{
+                if (sender !is Player)return true
+
+                val page = args[1].toIntOrNull()?:0
+
+                showBalanceQueue.add(Func { showHistory(sender,it,page) })
+
             }
 
             "buy" ->{
@@ -436,10 +446,10 @@ object Command :CommandExecutor{
         val percentMsg = text("${prefix}${percentColor}維持率:${format(percent,3)}%")
             .hoverEvent(HoverEvent.showText(text("§c§l維持率が20.0%を下回ると、ポジションが強制的に決済されます")))
 
-        val balanceMsg = text("${prefix}残高:${moneyFormat(balance)}               ")
+        val balanceMsg = text("${prefix}残高:${moneyFormat(balance)}")
             .hoverEvent(HoverEvent.showText(text("§f§nFXの口座は、銀行口座と別のものを使用します")))
 
-        val depositButton = text("§a§n${isAllowed(Forex.MarketStatus.deposit)}[入金]")
+        val depositButton = text("               §a§n${isAllowed(Forex.MarketStatus.deposit)}[入金]")
             .clickEvent(ClickEvent.suggestCommand("/mfx d "))
             .hoverEvent(HoverEvent.showText(text("§f銀行のお金を、FX口座に入金します")))
 
@@ -447,6 +457,7 @@ object Command :CommandExecutor{
             .clickEvent(ClickEvent.suggestCommand("/mfx w "))
             .hoverEvent(HoverEvent.showText(text("§fFX口座から、銀行に出金します\n§c§lポジションを持っているときは、出金できません")))
 
+        val historyButton = text("               §e§l§n[履歴を見る]").clickEvent(ClickEvent.runCommand("/mfx history 0"))
 
         val title = "${prefix}§e§l=============[Man10Trader(MT10)]============="
 
@@ -454,11 +465,14 @@ object Command :CommandExecutor{
         p.sendMessage(balanceMsg.append(depositButton).append(withdrawButton))
         p.sendMessage("${prefix}有効金額:${moneyFormat(margin)}")
         p.sendMessage("${prefix}${profitColor}評価額:${moneyFormat(allProfit)}")
-        p.sendMessage(percentMsg)
+        p.sendMessage(percentMsg.append(historyButton))
         p.sendMessage("${prefix}===============保有ポジション===============")
 
         if (Price.error){ p.sendMessage("${prefix}§c§l現在価格取得ができないため、エントリーなどができません") }
-        if (!Price.isActiveTime()){ p.sendMessage("${prefix}現在取引時間外です") }
+        if (!Price.isActiveTime()){
+            p.sendMessage("${prefix}現在取引時間外です")
+            return
+        }
 
         val prefix = text(prefix)
 
@@ -535,6 +549,71 @@ object Command :CommandExecutor{
 
     }
 
+    private fun showHistory(p:Player, sql:MySQLManager, page:Int = 0){
+
+        val rs = sql.query("select * from position_table where uuid='${p.uniqueId}' and `exit`=1 order by exit_date;")?:return
+
+        val list = mutableListOf<PositionHistory>()
+
+        while (rs.next()){
+
+            val data = PositionHistory(
+                rs.getString("entry_date"),
+                rs.getString("exit_date"),
+                rs.getString("symbol"),
+                rs.getInt("buy") == 1,
+                rs.getDouble("entry_price"),
+                rs.getDouble("exit_price"),
+                rs.getDouble("lots"),
+                rs.getDouble("profit")
+            )
+
+            list.add(data)
+        }
+
+        val totalProfit = list.sumOf { it.profit }
+        val hasPrevious = page>0
+        var hasNext = true
+
+        p.sendMessage("${prefix}§e§l=====トレードヒストリー=====")
+
+        for (i in page*10 until page*10+10){
+            if (list.size<=i){
+                hasNext = false
+                break
+            }
+
+            val data = list[i]
+
+            val hover = text("${if (data.isBuy) "§b§l買" else "§c§l売"}\n" +
+                    "§f§l銘柄:${data.symbol}\n" +
+                    "§f§l${ format(data.lot,2)}ロット\n" +
+                    "§f§l${format(data.entry,3)}→${format(data.exit)}\n" +
+                    "§f§l損益:${if (data.profit>0) "§b§l" else if (data.profit<0) "§c§l" else ""} ${format(data.profit,0)}円\n" +
+                    "§f§l決済時刻:${data.exitDate}")
+
+            val msg = text("$prefix${if (data.isBuy) "§b§l買" else "§c§l売"} §f§l${ format(data.lot,2)}ロット ${data.symbol} " +
+                    "${if (data.profit>0) "§b§l" else if (data.profit<0) "§c§l" else ""} ${format(data.profit,0)}円").hoverEvent(HoverEvent.showText(hover))
+
+            p.sendMessage(msg)
+        }
+
+        p.sendMessage("${prefix}§a§lトータル損益:${if (totalProfit>=0) "§b§l" else "§c§l"} ${format(totalProfit,0)}")
+
+        var prefix = text(prefix)
+        val previous = text("§f§l§n[前のページ]").clickEvent(ClickEvent.runCommand("/mfx history ${page-1}"))
+        val next = text("§f§l§n[次のページ]").clickEvent(ClickEvent.runCommand("/mfx history ${page+1}"))
+
+        if (hasPrevious){
+            prefix = prefix.append(previous)
+        }
+        if (hasNext){
+            prefix = prefix.append(next)
+        }
+
+        p.sendMessage(prefix)
+    }
+
     private fun showBalanceOP(p:CommandSender,sql: MySQLManager,mcid:String){
 
         val uuid = Bank.getUUID(mcid)?:return
@@ -605,4 +684,15 @@ object Command :CommandExecutor{
     private fun isAllowed(boolean: Boolean):String{
         return if (boolean) "" else "§m"
     }
+
+    data class PositionHistory(
+        var entryDate : String,
+        var exitDate : String,
+        var symbol : String,
+        var isBuy : Boolean,
+        var entry : Double,
+        var exit : Double,
+        var lot : Double,
+        var profit : Double
+    )
 }
