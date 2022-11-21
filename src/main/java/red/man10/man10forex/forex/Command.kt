@@ -28,7 +28,6 @@ import red.man10.man10forex.forex.Forex.setTP
 import red.man10.man10forex.forex.Forex.symbols
 import red.man10.man10forex.util.MySQLManager
 import red.man10.man10forex.util.Price
-import red.man10.man10forex.util.Utility
 import red.man10.man10forex.util.Utility.format
 import red.man10.man10forex.util.Utility.moneyFormat
 import red.man10.man10forex.util.Utility.priceFormat
@@ -571,7 +570,10 @@ object Command :CommandExecutor{
             list.add(data)
         }
 
-        val totalProfit = list.sumOf { it.profit }
+        val netProfit = list.sumOf { it.profit }
+        val profit = list.filter { it.profit>0 }.sumOf { it.profit }
+        val loss = list.filter { it.profit<0 }.sumOf { it.profit }
+        val profitFactor = profit/loss
         val hasPrevious = page>0
         var hasNext = true
 
@@ -588,7 +590,7 @@ object Command :CommandExecutor{
             val hover = text("${if (data.isBuy) "§b§l買" else "§c§l売"}\n" +
                     "§f§l銘柄:${data.symbol}\n" +
                     "§f§l${ format(data.lot,2)}ロット\n" +
-                    "§f§l${format(data.entry,3)}→${format(data.exit)}\n" +
+                    "§f§l${format(data.entry,3)}→${format(data.exit,3)}\n" +
                     "§f§l損益:${if (data.profit>0) "§b§l" else if (data.profit<0) "§c§l" else ""} ${format(data.profit,0)}円\n" +
                     "§f§l決済時刻:${data.exitDate}")
 
@@ -598,7 +600,8 @@ object Command :CommandExecutor{
             p.sendMessage(msg)
         }
 
-        p.sendMessage("${prefix}§a§lトータル損益:${if (totalProfit>=0) "§b§l" else "§c§l"} ${format(totalProfit,0)}円")
+        p.sendMessage("${prefix}§a§lトータル損益:${if (netProfit>=0) "§b§l" else "§c§l"} ${format(netProfit,0)}円")
+        p.sendMessage("${prefix}§a§lプロフィットファクター:${if (profitFactor>=0) "§b§l" else "§c§l"} ${format(profitFactor,2)}")
 
         var prefix = text(prefix)
         val previous = text("§f§l§n[前のページ]").clickEvent(ClickEvent.runCommand("/mfx history ${page-1}"))
