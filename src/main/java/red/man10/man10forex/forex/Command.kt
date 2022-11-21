@@ -38,7 +38,7 @@ import java.util.concurrent.LinkedBlockingQueue
 object Command :CommandExecutor{
 
     private val showBalanceQueue = LinkedBlockingQueue<Func>()
-    private val sdf = SimpleDateFormat("MM/dd HH:mm")
+    private val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm")
 
     init {
         Thread{ showQueue() }.start()
@@ -387,6 +387,16 @@ object Command :CommandExecutor{
                 //Forex.showQueueStatus(sender)
             }
 
+            "stat" ->{
+                if (!sender.hasPermission(OP)){return true}
+
+                Thread{
+                    val sql = MySQLManager(plugin,"ShowBalanceOP")
+                    showStat(sender,sql)
+                }.start()
+
+            }
+
             "exitop" ->{//mfx exitop player id price
                 if (!sender.hasPermission(OP)){ return true }
 
@@ -557,8 +567,8 @@ object Command :CommandExecutor{
         while (rs.next()){
 
             val data = PositionHistory(
-                rs.getString("entry_date"),
-                rs.getString("exit_date"),
+                rs.getDate("entry_date"),
+                rs.getDate("exit_date"),
                 rs.getString("symbol"),
                 rs.getInt("buy") == 1,
                 rs.getDouble("entry_price"),
@@ -569,6 +579,9 @@ object Command :CommandExecutor{
 
             list.add(data)
         }
+
+        rs.close()
+        sql.close()
 
         val netProfit = list.sumOf { it.profit }
         val profit = list.filter { it.profit>0 }.sumOf { it.profit }
@@ -592,7 +605,7 @@ object Command :CommandExecutor{
                     "§f§l${ format(data.lot,2)}ロット\n" +
                     "§f§l${format(data.entry,3)}→${format(data.exit,3)}\n" +
                     "§f§l損益:${if (data.profit>0) "§b§l" else if (data.profit<0) "§c§l" else ""} ${format(data.profit,0)}円\n" +
-                    "§f§l決済時刻:${data.exitDate}")
+                    "§f§l決済時刻:${sdf.format(data.exitDate)}")
 
             val msg = text("$prefix${if (data.isBuy) "§b§l買" else "§c§l売"} §f§l${ format(data.lot,2)}ロット ${data.symbol} " +
                     "${if (data.profit>0) "§b§l" else if (data.profit<0) "§c§l" else ""} ${format(data.profit,0)}円").hoverEvent(HoverEvent.showText(hover))
@@ -684,13 +697,56 @@ object Command :CommandExecutor{
         }
     }
 
+    private fun showStat(p: CommandSender, sql: MySQLManager){
+
+        val rs = sql.query("select * from position_table where `exit`=1 order by exit_date desc;")?:return
+
+        val list = mutableListOf<PositionHistory>()
+
+        while (rs.next()){
+
+            val data = PositionHistory(
+                rs.getDate("entry_date"),
+                rs.getDate("exit_date"),
+                rs.getString("symbol"),
+                rs.getInt("buy") == 1,
+                rs.getDouble("entry_price"),
+                rs.getDouble("exit_price"),
+                rs.getDouble("lots"),
+                rs.getDouble("profit")
+            )
+
+            list.add(data)
+        }
+
+        rs.close()
+        sql.close()
+
+        val month = Calendar.getInstance()
+        month.time = Date()
+        month.set(Calendar.DAY_OF_MONTH,1)
+
+        val lastMonth = Calendar.getInstance()
+        lastMonth.time = Date()
+        lastMonth.set(Calendar.DAY_OF_MONTH,1)
+        lastMonth.add(Calendar.MONTH,-1)
+
+        val profit = list.sumOf { it.profit }
+        val monthlyProfile = list.filter { it.exitDate.after(month.time) }.sumOf { it.profit }
+        val lastMonthProfit = list.filter { it.exitDate.after(lastMonth.time) || it.exitDate.before(month.time) }.sumOf { it.profit }
+
+        p.sendMessage("全期間の損益:${format(profit)}円")
+        p.sendMessage("今月の損益:${format(monthlyProfile)}円")
+        p.sendMessage("先月の損益:${format(lastMonthProfit)}円")
+    }
+
     private fun isAllowed(boolean: Boolean):String{
         return if (boolean) "" else "§m"
     }
 
     data class PositionHistory(
-        var entryDate : String,
-        var exitDate : String,
+        var entryDate : Date,
+        var exitDate : Date,
         var symbol : String,
         var isBuy : Boolean,
         var entry : Double,
