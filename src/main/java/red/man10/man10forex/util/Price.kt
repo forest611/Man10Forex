@@ -6,7 +6,9 @@ import okhttp3.Request
 import org.bukkit.command.Command
 import org.bukkit.command.CommandExecutor
 import org.bukkit.command.CommandSender
+import org.bukkit.entity.Player
 import red.man10.man10forex.forex.Forex
+import red.man10.man10forex.util.Utility.format
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 
@@ -15,6 +17,7 @@ object Price : CommandExecutor{
     var url = "http://taro:824/api/price"
 
     private val symbolMap = ConcurrentHashMap<String,PriceData>()
+    private val notifyPlayer = ConcurrentHashMap<String,MutableList<Player>>()
 
     var finalDate = ""
 
@@ -119,38 +122,45 @@ object Price : CommandExecutor{
                     continue@Main
                 }
 
-                var checkedDate = false//時刻確認フラグ
-
                 for (obj in jsonObj){
                     val symbol = obj.symbol
-
-//                    //前回と取得時刻が変わらなかった場合はエラー
-//                    if (finalDate == obj.time && !checkedDate){
-//                        dateCount++
-//                        if (dateCount>=20){ error = true }
-//                        continue@Main
-//                    }
-
-                    checkedDate = true
                     dateCount = 0
 
                     finalDate = obj.time
 
-                    val sData = Forex.symbols[symbol]?:continue
+                    val symbolSetting = Forex.symbols[symbol]?:continue
 
                     val price = (obj.bid+obj.ask)/2.0
-                    val ask = price+(Forex.pipsToPrice(sData.spread,symbol)/2.0)
-                    val bid = price-(Forex.pipsToPrice(sData.spread,symbol)/2.0)
+                    val ask = price+(Forex.pipsToPrice(symbolSetting.spread,symbol)/2.0)
+                    val bid = price-(Forex.pipsToPrice(symbolSetting.spread,symbol)/2.0)
 
                     val data = PriceData(symbol,bid,ask,price)
 
+                    val lastData = symbolMap[symbol]
+
                     symbolMap[symbol] = data
+
+                    if (lastData!=null && lastData.price!=price){
+                        notifyChangePrice(symbol,lastData.price,price)
+                    }
                 }
 
                 error = false
             }catch (e:java.lang.Exception){
                 error = true
             }
+        }
+
+    }
+
+    private fun notifyChangePrice(symbol: String,last:Double,now:Double){
+
+        val color = if (now>last) "§b" else "§c"
+        val lastString = format(last,3)
+        val nowString = format(now,3)
+
+        for (p in notifyPlayer[symbol]?:return){
+            p.sendMessage("${color}${symbol} ${lastString}→${nowString}")
         }
 
     }
@@ -172,6 +182,22 @@ object Price : CommandExecutor{
         val symbol = args[1]
 
         when(args[0]){
+
+            "notify" ->{
+
+                if (sender !is Player)return true
+
+                val list = notifyPlayer[symbol]?: mutableListOf()
+
+                if (list.contains(sender)){
+                    list.remove(sender)
+                    sender.sendMessage("§a価格変更通知をオフにしました")
+                }else{
+                    list.add(sender)
+                    sender.sendMessage("§a価格変更通知をオンにしました")
+                }
+                notifyPlayer[symbol] = list
+            }
 
             "price" ->{
 

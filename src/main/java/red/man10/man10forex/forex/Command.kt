@@ -553,7 +553,9 @@ object Command :CommandExecutor{
                 .clickEvent(ClickEvent.suggestCommand("/mfx buy $symbol "))
                 .hoverEvent(HoverEvent.showText(text("§a現在価格より上回ったら利益がでます\n§a/mfx buy $symbol <ロット数>(0.01〜1000)")))
 
-            p.sendMessage(prefix.append(symbolText).append(sellButton).append(maxLot).append(buyButton))
+            val notifyButton = text(" §f§l§n[価格変更通知]").clickEvent(ClickEvent.runCommand("/zfx notify $symbol"))
+
+            p.sendMessage(prefix.append(symbolText).append(sellButton).append(maxLot).append(buyButton).append(notifyButton))
         }
 
     }
