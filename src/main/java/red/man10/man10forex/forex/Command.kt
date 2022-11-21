@@ -724,16 +724,16 @@ object Command :CommandExecutor{
 
         val month = Calendar.getInstance()
         month.time = Date()
-        month.set(Calendar.DAY_OF_MONTH,1)
+        month.set(Calendar.DAY_OF_MONTH,0)
 
         val lastMonth = Calendar.getInstance()
         lastMonth.time = Date()
-        lastMonth.set(Calendar.DAY_OF_MONTH,1)
+        lastMonth.set(Calendar.DAY_OF_MONTH,0)
         lastMonth.add(Calendar.MONTH,-1)
 
         val profit = list.sumOf { it.profit }
         val monthlyProfile = list.filter { it.exitDate.after(month.time) }.sumOf { it.profit }
-        val lastMonthProfit = list.filter { it.exitDate.after(lastMonth.time) || it.exitDate.before(month.time) }.sumOf { it.profit }
+        val lastMonthProfit = list.filter { it.exitDate.after(lastMonth.time) && it.exitDate.before(month.time) }.sumOf { it.profit }
 
         p.sendMessage("全期間の損益:${format(profit)}円")
         p.sendMessage("今月の損益:${format(monthlyProfile)}円")
