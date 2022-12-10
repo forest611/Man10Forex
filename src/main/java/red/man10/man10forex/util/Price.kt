@@ -7,7 +7,9 @@ import org.bukkit.command.Command
 import org.bukkit.command.CommandExecutor
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
+import red.man10.man10forex.Man10Forex
 import red.man10.man10forex.forex.Forex
+import red.man10.man10forex.map.MappRenderer
 import red.man10.man10forex.util.Utility.format
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
@@ -221,6 +223,14 @@ object Price : CommandExecutor{
                     symbolMap.keys.forEach { sender.sendMessage("§b§l現在価格(Ask)(${it})....${String.format("%,.3f",ask(it))}") }
                 }else{
                     sender.sendMessage("§b§l現在価格(Ask)....${String.format("%,.3f",ask(symbol))}")
+                }
+            }
+
+            "map" ->{
+                if (sender.hasPermission(Man10Forex.OP)){
+                    val map = MappRenderer.getMapItem(Man10Forex.plugin,"PriceGUI")
+                    if (sender !is Player)return false
+                    sender.inventory.addItem(map)
                 }
             }
 

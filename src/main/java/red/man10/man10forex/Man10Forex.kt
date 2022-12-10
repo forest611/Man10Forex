@@ -6,6 +6,7 @@ import red.man10.man10forex.forex.Forex
 import red.man10.man10forex.forex.ForexBank
 import red.man10.man10forex.highlow.Command
 import red.man10.man10forex.highlow.HighLowGame
+import red.man10.man10forex.map.MappRenderer
 import red.man10.man10forex.util.MenuFramework
 import red.man10.man10forex.util.MySQLManager
 import red.man10.man10forex.util.Price
@@ -38,6 +39,8 @@ class Man10Forex : JavaPlugin() {
         server.pluginManager.registerEvents(MenuFramework.MenuListener,this)
         server.pluginManager.registerEvents(ForexBank,this)
         MySQLManager.runAsyncMySQLQueue(plugin,"Man10Forex")
+
+        MappRenderer.setup(this)
 
     }
 
