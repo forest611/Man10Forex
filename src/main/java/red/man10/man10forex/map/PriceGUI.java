@@ -10,20 +10,11 @@ import java.util.List;
 
 public class PriceGUI extends MappApp {
     private static final String appName = "PriceGUI";
-    private static final int drawCycle = 20; //毎秒更新
+    private static final int drawCycle = 10; //毎秒更新
 
     private static final HashMap<Integer,String > dataMap = new HashMap<>();
 
     public static void register() {
-
-
-        MappRenderer.playerChatEvent(appName,((key, mapId, event) -> {
-
-            String text = event.getMessage();
-            dataMap.put(mapId,text);
-
-            return true;
-        }));
 
         MappRenderer.displayTouchEvent(appName, ((key, mapId, player, x, y) -> {
 
@@ -56,9 +47,11 @@ public class PriceGUI extends MappApp {
 
             String symbol = dataMap.get(mapId);
 
-            if (symbol == null)return false;
+            if (symbol == null){
+                symbol = "USDJPY";
+            }
 
-            g.setColor(Color.BLACK);
+            g.setColor(Color.DARK_GRAY);
             g.fillRect(0,0,128,128);
 
             double ask = Price.INSTANCE.ask(symbol);
