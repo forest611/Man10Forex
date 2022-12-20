@@ -10,7 +10,7 @@ import java.util.List;
 
 public class PriceGUI extends MappApp {
     private static final String appName = "PriceGUI";
-    private static final int drawCycle = 10; //毎秒更新
+    private static final int drawCycle = 100; //毎秒更新
 
     private static final HashMap<Integer,String > dataMap = new HashMap<>();
 
@@ -60,11 +60,15 @@ public class PriceGUI extends MappApp {
             g.setFont(new Font("SansSerif",Font.BOLD,15));
 
             g.setColor(Color.YELLOW);
-            g.drawString("銘柄:"+symbol,10,30);
+            g.drawString("銘柄:"+symbol,15,30);
             g.setColor(Color.RED);
-            g.drawString("買値:"+Utility.INSTANCE.format(ask,3),10,60);
+            g.drawString("買値:"+Utility.INSTANCE.format(ask,3),15,60);
             g.setColor(Color.CYAN);
-            g.drawString("売値:"+Utility.INSTANCE.format(bid,3),10,90);
+            g.drawString("売値:"+Utility.INSTANCE.format(bid,3),15,90);
+
+            g.setFont(new Font("SansSerif",Font.PLAIN,10));
+            g.setColor(Color.YELLOW);
+            g.drawString("価格は5秒ごとに更新",15,110);
 
             return true;
         });

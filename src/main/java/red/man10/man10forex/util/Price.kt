@@ -109,7 +109,7 @@ object Price : CommandExecutor{
 
                 val request = Request.Builder().url(url).build()
                 val response = client.newCall(request).execute()
-                val body = response.body?.string()
+                val body = response.body?.string()?.replace("/","")
 
                 //レスポンスが返ってこなかったら止める
                 if (body == null){
