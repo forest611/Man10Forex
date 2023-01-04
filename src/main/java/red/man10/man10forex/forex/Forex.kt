@@ -361,7 +361,7 @@ object Forex {
         val symbol = position!!.symbol
 
         val price = exitPrice ?: if (position!!.buy) Price.bid(symbol) else Price.ask(symbol)
-        val profit = profit(position!!,price)
+        var profit = profit(position!!,price)
 
         if (profit>0){
             ForexBank.deposit(uuid,profit, "ForexProfit","FX利益")
@@ -373,6 +373,8 @@ object Forex {
             if (!ForexBank.withdraw(uuid,-profit, "ForexLoss",msg)){
                 //ゼロカット
                 val bal = ForexBank.getBalance(uuid)
+                //損益額をゼロカットした分に修正
+                profit = bal
                 ForexBank.withdraw(uuid,bal,"ZeroCUT","ゼロカット")
             }
         }
