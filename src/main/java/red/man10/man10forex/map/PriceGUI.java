@@ -57,7 +57,7 @@ public class PriceGUI extends MappApp {
             double ask = Price.INSTANCE.ask(symbol);
             double bid = Price.INSTANCE.bid(symbol);
 
-            g.setFont(new Font("SansSerif",Font.BOLD,15));
+            g.setFont(new Font(Font.DIALOG,Font.BOLD,15));
 
             g.setColor(Color.YELLOW);
             g.drawString("銘柄:"+symbol,15,30);
