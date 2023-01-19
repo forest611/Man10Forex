@@ -77,18 +77,7 @@ object Forex {
     //static
 
     init {
-
-        symbols.clear()
-
-        Thread{
-            Thread.sleep(1000)
-
-            for (symbol in symbolList){
-                symbols[symbol] = Symbol(symbol)
-            }
-        }.start()
-
-        runThread()
+        reload()
     }
 
     fun reload(){
@@ -103,10 +92,9 @@ object Forex {
             for (symbol in symbolList){
                 symbols[symbol] = Symbol(symbol)
             }
+            Price.startPriceThread()
+            runThread()
         }.start()
-
-
-        runThread()
     }
 
     fun loadConfig(){

@@ -64,7 +64,10 @@ object Command : CommandExecutor{
                     return true
                 }
 
-                if (!sender.hasPermission(HIGHLOW_USER)){ return true }
+                if (!sender.hasPermission(HIGHLOW_USER)){
+                    sender.sendMessage("${Forex.prefix}権限がありません！")
+                    return true
+                }
 
                 if (!isEnableGame){
                     sender.sendMessage("${prefix}現在ハイ&ローの取引が停止しています")

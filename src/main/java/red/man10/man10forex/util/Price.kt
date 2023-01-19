@@ -3,6 +3,7 @@ package red.man10.man10forex.util
 import com.google.gson.Gson
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import org.bukkit.Bukkit
 import org.bukkit.command.Command
 import org.bukkit.command.CommandExecutor
 import org.bukkit.command.CommandSender
@@ -21,14 +22,12 @@ object Price : CommandExecutor{
     private val symbolMap = ConcurrentHashMap<String,PriceData>()
     private val notifyPlayer = ConcurrentHashMap<String,MutableList<Player>>()
 
-    var finalDate = ""
+    private var finalDate = ""
+    private var dateCount = 0
+
+    private var priceThread = Thread{asyncGetPriceThread()}
 
     var error = true
-    var dateCount = 0
-
-    init {
-        Thread{asyncGetPriceThread()}.start()
-    }
 
     //取引時間かどうか
     fun isActiveTime():Boolean{
@@ -91,19 +90,26 @@ object Price : CommandExecutor{
         val price : Double
     )
 
+    fun startPriceThread(){
+
+        if (priceThread.isAlive){
+            priceThread.interrupt()
+        }
+        priceThread = Thread{asyncGetPriceThread()}
+        priceThread.start()
+
+    }
     private fun asyncGetPriceThread(){
 
         val client = OkHttpClient.Builder().cache(null).build()
 
         Main@while (true){
 
-            Thread.sleep(100)
-
-            //if (!isActiveTime())continue@Main
-
             try {
+                Thread.sleep(100)
 
                 if (error){
+                    Bukkit.getLogger().info("ConnectError")
                     client.connectionPool.evictAll()
                 }
 
@@ -148,7 +154,10 @@ object Price : CommandExecutor{
                 }
 
                 error = false
-            }catch (e:java.lang.Exception){
+            }catch (e:InterruptedException){
+                Bukkit.getLogger().info("PriceThreadInterrupt")
+                break@Main
+            } catch (e:java.lang.Exception){
                 error = true
             }
         }
