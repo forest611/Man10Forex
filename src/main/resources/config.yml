@@ -1,10 +1,45 @@
-MinPrice: 50000
-MaxPrice: 500000
+MinPrice: 100
+MaxPrice: 1000000
 MinSecond: 10
 MaxSecond: 60
+LossCutPercent: 20
+OverAllMaxLot: 1000
+PriceURL: http://localhost/api/price
 mysql:
   host: localhost
   user: root
   pass: pass
-  db: man10_binary
+  db: man10_forex
   port: 3306
+Status:
+  Entry: true
+  Exit: true
+  Withdraw: true
+  Deposit: true
+  TPSL: true
+  LossCut: true
+SymbolList:
+  - USDJPY
+  - EURUSD
+  - XAUUSD
+USDJPY:
+  Leverage: 888
+  MinLot: 0.01
+  MaxLot: 1000.0
+  PipsAmount: 100.0
+  SpreadPips: 1
+  ContractSize: 100000
+EURUSD:
+  Leverage: 888
+  MinLot: 0.01
+  MaxLot: 1000.0
+  PipsAmount: 10000.0
+  SpreadPips: 0.3
+  ContractSize: 100000
+XAUUSD:
+  Leverage: 100
+  MinLot: 0.01
+  MaxLot: 100.0
+  PipsAmount: 10
+  SpreadPips: 3.0
+  ContractSize: 100
