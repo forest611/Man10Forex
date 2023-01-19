@@ -20,6 +20,7 @@ object Forex {
     private var queueThread = Thread{ queueThread() }
 
     var lossCutPercent : Double = 20.0
+    var overallMaxLot : Double = 1000.0//全体での最大ロット
 
     var symbols = ConcurrentHashMap<String,Symbol>()
     var symbolList = mutableListOf<String>()
@@ -114,6 +115,8 @@ object Forex {
         symbolList = plugin.config.getStringList("SymbolList")//使う銘柄のリスト
         Price.url = plugin.config.getString("PriceURL")?:""
         lossCutPercent = plugin.config.getDouble("LossCutPercent")
+        overallMaxLot = plugin.config.getDouble("OverAllMaxLot")
+
         MarketStatus.entry = plugin.config.getBoolean("Status.Entry")
         MarketStatus.exit = plugin.config.getBoolean("Status.Exit")
         MarketStatus.withdraw = plugin.config.getBoolean("Status.Withdraw")
@@ -146,6 +149,12 @@ object Forex {
 
             if (data==null){
                 p.sendMessage("${prefix}存在しない銘柄です")
+                return@Job
+            }
+
+            //同時保有ロットの制限追加
+            if ((positions.sumOf { it.lots } + lots) > overallMaxLot){
+                p.sendMessage("${prefix}同時に保有できるロット数は${overallMaxLot}ロットまでです！")
                 return@Job
             }
 
@@ -374,7 +383,7 @@ object Forex {
                 //ゼロカット
                 val bal = ForexBank.getBalance(uuid)
                 //損益額をゼロカットした分に修正
-                profit = bal
+                profit = bal*-1
                 ForexBank.withdraw(uuid,bal,"ZeroCUT","ゼロカット")
             }
         }
