@@ -113,6 +113,11 @@ object Command : CommandExecutor{
                     return true
                 }
 
+                if (HighLowGame.checkNowEntry(sender)){
+                    sender.sendMessage("${prefix}ハイローの多重エントリーはできません")
+                    return true
+                }
+
                 Thread{
                     if (bank.withdraw(sender.uniqueId,amount,"HighLowEntry","ハイ&ローエントリ")){
                         sender.sendMessage("${prefix}ハイ&ローのエントリーをしました！")

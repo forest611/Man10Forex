@@ -20,6 +20,8 @@ object HighLowGame {
     var minSecond = 10
     var maxSecond = 60
 
+    private var spread = 0.001
+
     private const val symbol = "USDJPY"
 
     var isEnableGame = true
@@ -35,6 +37,7 @@ object HighLowGame {
         maxPrice = Man10Forex.plugin.config.getDouble("MaxPrice")
         minSecond = Man10Forex.plugin.config.getInt("MinSecond")
         maxSecond = Man10Forex.plugin.config.getInt("MaxSecond")
+        spread = Man10Forex.plugin.config.getDouble("HighLowSpread")
     }
 
     //全ポジ閉じる
@@ -50,6 +53,10 @@ object HighLowGame {
 
     }
 
+    fun checkNowEntry(p:Player):Boolean{
+        return positionList.any { it.uuid == p.uniqueId }
+    }
+
     fun entry(p:Player,betAmount: Double,exitSecond: Int,isHigh: Boolean){
         val position = Position(p.uniqueId,betAmount,0.0,isHigh,exitSecond, Date(), Date())
         positionList.add(position)
@@ -60,9 +67,11 @@ object HighLowGame {
         val p = Bukkit.getOfflinePlayer(position.uuid)
         val price = price(symbol)
 
-        val isWin = if (price>position.entryPrice && position.isHigh){
-            true
-        }else price<position.entryPrice && !position.isHigh
+        val isWin = if (position.isHigh){
+            price>position.entryPrice + spread
+        } else {
+            price < position.entryPrice - spread
+        }
 
         if (p.isOnline){
 
