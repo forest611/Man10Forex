@@ -18,6 +18,7 @@ import red.man10.man10forex.highlow.HighLowGame.maxSecond
 import red.man10.man10forex.highlow.HighLowGame.minPrice
 import red.man10.man10forex.highlow.HighLowGame.minSecond
 import red.man10.man10forex.highlow.HighLowGame.prefix
+import red.man10.man10forex.highlow.HighLowGame.startThread
 import red.man10.man10forex.util.MySQLManager
 import red.man10.man10forex.util.Price
 import java.util.*
@@ -134,6 +135,7 @@ object Command : CommandExecutor{
                 if (!sender.hasPermission(OP)){ return true }
                 loadConfig()
                 HighLowGame.closeAll()
+                startThread()
                 sender.sendMessage("${prefix}リロード完了")
             }
 

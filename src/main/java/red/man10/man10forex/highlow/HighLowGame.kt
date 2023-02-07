@@ -26,8 +26,10 @@ object HighLowGame {
 
     var isEnableGame = true
 
+    private var thread = Thread{ highLowThread() }
+
     init {
-        Thread{ highLowThread() }.start()
+        startThread()
     }
 
     fun loadConfig(){
@@ -65,12 +67,14 @@ object HighLowGame {
     private fun exit(position:Position){
 
         val p = Bukkit.getOfflinePlayer(position.uuid)
-        val price = price(symbol)
+        var price = price(symbol)
 
         val isWin = if (position.isHigh){
-            price>position.entryPrice + spread
+            price -= spread
+            price>position.entryPrice
         } else {
-            price < position.entryPrice - spread
+            price += spread
+            price < position.entryPrice
         }
 
         if (p.isOnline){
@@ -101,7 +105,19 @@ object HighLowGame {
 
     }
 
-    fun highLowThread(){
+    fun startThread(){
+
+        if (thread.isAlive){
+            thread.interrupt()
+            thread = Thread{ highLowThread() }
+        }
+
+        thread.start()
+
+
+    }
+
+    private fun highLowThread(){
 
         while (true){
 
@@ -156,7 +172,10 @@ object HighLowGame {
 
                 Thread.sleep(200)
 
-            }catch (e:Exception){
+            }catch (e:InterruptedException){
+                Bukkit.getLogger().info("ReloadHighLow")
+                break
+            } catch (e:Exception){
                 Bukkit.getLogger().info(e.message)
             }
 
