@@ -35,6 +35,7 @@ object Forex {
         var contractSize : Int = 100000
         var spread : Double = 2.0  //スプレッド(Pips)
         var pipsAmount : Int = 100 //Priceにいくつ書けるとPipsになるか
+        var slippageAmount : Double = 0.0005 //ロット数x指定係数をスプレッドpipsとして上乗せ
 
         init {
             loadConfig()
@@ -50,6 +51,7 @@ object Forex {
                 plugin.config.set("${symbol}.PipsAmount",pipsAmount)
                 plugin.config.set("${symbol}.SpreadPips",spread)
                 plugin.config.set("${symbol}.ContractSize",contractSize)
+                plugin.config.set("${symbol}.SlippageAmount",slippageAmount)
 
                 plugin.saveConfig()
 
@@ -63,6 +65,7 @@ object Forex {
             pipsAmount = plugin.config.getInt("${symbol}.PipsAmount")
             spread = plugin.config.getDouble("${symbol}.SpreadPips")
             contractSize = plugin.config.getInt("${symbol}.ContractSize")
+            slippageAmount = plugin.config.getDouble("${symbol}.SlippageAmount")
 
             Bukkit.getLogger().info("==========${symbol}==========")
             Bukkit.getLogger().info("Leverage:${leverage}")
@@ -71,6 +74,7 @@ object Forex {
             Bukkit.getLogger().info("PipsAmount:${pipsAmount}")
             Bukkit.getLogger().info("SpreadPips:${spread}")
             Bukkit.getLogger().info("ContractSize:${contractSize}")
+            Bukkit.getLogger().info("SlippageAmount:${slippageAmount}")
         }
     }
 
@@ -130,15 +134,26 @@ object Forex {
         val job = Job {sql->
 
             val id = UUID.randomUUID()
-            val price = if (isBuy) Price.ask(symbol) else Price.bid(symbol)
-            val positions = asyncGetUserPositions(p.uniqueId,sql)
-            val maxLots = getMaxLots(p.uniqueId,price,positions,symbol)
+            var price = if (isBuy) Price.ask(symbol) else Price.bid(symbol)
+
             val data = symbols[symbol]
 
             if (data==null){
                 p.sendMessage("${prefix}存在しない銘柄です")
                 return@Job
             }
+
+            val slippagePrice = lots*data.slippageAmount
+
+            Bukkit.getLogger().info("ロット数:${lots} 発生スリッページPips:${slippagePrice*data.pipsAmount}")
+
+            if (slippagePrice*data.pipsAmount>1){
+                if (isBuy) price+=slippagePrice else price-=slippagePrice
+            }
+
+            val positions = asyncGetUserPositions(p.uniqueId,sql)
+            val maxLots = getMaxLots(p.uniqueId,price,positions,symbol)
+
 
             //同時保有ロットの制限追加
             if ((positions.sumOf { it.lots } + lots) > overallMaxLot){
