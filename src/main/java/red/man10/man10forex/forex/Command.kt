@@ -256,6 +256,27 @@ object Command :CommandExecutor{
                 return true
             }
 
+            "exitall" ->{
+                if (sender !is Player)return false
+
+                if (!Price.isActiveTime()){
+                    sender.sendMessage("${prefix}現在取引時間外です")
+                    return true
+                }
+
+                if (Price.error){
+                    sender.sendMessage("${prefix}価格取得によりイグジット失敗！しばらく続く場合、サーバーにレポートを送ってください(${sdf.format(Date())})。")
+                    return true
+                }
+
+                if (!Forex.MarketStatus.exit){
+                    sender.sendMessage("${prefix}現在手動決済はできません")
+                    return true
+                }
+
+                Forex.exitAll(sender.uniqueId)
+            }
+
             "d" ->{
 
                 if (sender!is Player)return false
@@ -449,7 +470,9 @@ object Command :CommandExecutor{
         val percent = marginPercent(uuid, list)?:0.0
         val allProfit = allProfit(list)
 
+        //評価額の色
         val profitColor = if (allProfit<0) "§4§l" else if (allProfit>0) "§b§l" else "§f§l"
+        //維持率の色
         val percentColor =  if (percent==0.0) "§f§l" else if (percent< lossCutPercent*1.5) "§4§l" else if (percent< lossCutPercent*2.0) "§6§l"  else "§f§l"
 
         val percentMsg = text("${prefix}${percentColor}維持率:${format(percent,3)}%")
@@ -512,7 +535,7 @@ object Command :CommandExecutor{
 
             val exitButton = text(exitText)
                 .clickEvent(ClickEvent.runCommand("/mfx exit ${it.positionID}"))
-                .hoverEvent(HoverEvent.showText(text("現在の価格で損益の確定を行います")))
+                .hoverEvent(HoverEvent.showText(text("§b現在の価格で損益の確定を行います\n§b('/mfx exitall'で全てのポジションを決済します)")))
 
 
             val tpButton = text(tpText)

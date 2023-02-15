@@ -356,24 +356,37 @@ object Forex {
     fun exit(uuid: UUID,pos:UUID,isLossCut:Boolean,exitPrice: Double? = null){
         jobQueue.add(Job {asyncExit(uuid, pos, isLossCut, it, exitPrice) })
     }
+
+    //現在価格で全部Exitする
+    fun exitAll(uuid:UUID){
+
+        jobQueue.add{sql ->
+
+            val pos = asyncGetUserPositions(uuid,sql)
+
+            pos.forEach { asyncExit(uuid,it.positionID,false,sql) }
+
+        }
+
+    }
     private fun asyncExit(uuid: UUID, pos:UUID, isLossCut:Boolean, sql: MySQLManager, exitPrice: Double? = null){
 
         val list = asyncGetUserPositions(uuid, sql)
-        var position: Position? = null
+//        var position: Position? = null
+//
+//        list.forEach {
+//            if (it.positionID == pos){
+//                position = it
+//                return@forEach
+//            }
+//        }
+//
+        val position = list.firstOrNull { it.positionID == pos } ?: return
 
-        list.forEach {
-            if (it.positionID == pos){
-                position = it
-                return@forEach
-            }
-        }
+        val symbol = position.symbol
 
-        if (position==null)return
-
-        val symbol = position!!.symbol
-
-        val price = exitPrice ?: if (position!!.buy) Price.bid(symbol) else Price.ask(symbol)
-        var profit = profit(position!!,price)
+        val price = exitPrice ?: if (position.buy) Price.bid(symbol) else Price.ask(symbol)
+        var profit = profit(position,price)
 
         if (profit>0){
             ForexBank.deposit(uuid,profit, "ForexProfit","FX利益")
@@ -391,7 +404,7 @@ object Forex {
             }
         }
 
-        sql.execute("UPDATE position_table SET `exit` = 1, exit_price = ${price}, profit = ${profit}, exit_date = now() WHERE position_id = '${position!!.positionID}';")
+        sql.execute("UPDATE position_table SET `exit` = 1, exit_price = ${price}, profit = ${profit}, exit_date = now() WHERE position_id = '${position.positionID}';")
 
         //オンラインだったらメッセージを送る
         val p = Bukkit.getOfflinePlayer(uuid).player?:return
@@ -541,9 +554,6 @@ object Forex {
         jobQueue.add(job)
     }
 
-    private fun checkPending(uuid: UUID){
-
-    }
 
     //####################################管理スレッド##################################
 
