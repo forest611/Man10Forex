@@ -70,10 +70,8 @@ object HighLowGame {
         var price = price(symbol)
 
         val isWin = if (position.isHigh){
-            price -= spread
             price>position.entryPrice
         } else {
-            price += spread
             price < position.entryPrice
         }
 
@@ -142,7 +140,11 @@ object HighLowGame {
 
                     //エントリー価格決定
                     if (it.entryPrice == 0.0){
-                        it.entryPrice = price
+
+                        it.entryPrice = when(it.isHigh){
+                            true-> price+ spread
+                            else -> price- spread
+                        }
                     }
 
                     //Exit時間経過
