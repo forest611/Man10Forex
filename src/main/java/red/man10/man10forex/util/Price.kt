@@ -19,15 +19,19 @@ object Price : CommandExecutor{
 
     var url = "http://taro:824/api/price"
 
+    private val gson = Gson()
+
     private val symbolMap = ConcurrentHashMap<String,PriceData>()
     private val notifyPlayer = ConcurrentHashMap<String,MutableList<Player>>()
 
-    private var finalDate = ""
-    private var dateCount = 0
+    private var lastGotDate = Date()
+    private var dateStr = ""
 
     private var priceThread = Thread{asyncGetPriceThread()}
 
     var error = true
+    var threadInterval = 100
+    var errorSecond = 60 //n秒以上失敗したらエラー扱い
 
     //取引時間かどうか
     fun isActiveTime():Boolean{
@@ -106,7 +110,7 @@ object Price : CommandExecutor{
         Main@while (true){
 
             try {
-                Thread.sleep(100)
+                Thread.sleep(threadInterval.toLong())
 
                 if (error){
                     Bukkit.getLogger().info("ConnectError")
@@ -123,7 +127,7 @@ object Price : CommandExecutor{
                     continue@Main
                 }
 
-                val jsonObj = Gson().fromJson(body,Array<DeserializedData>::class.java)
+                val jsonObj = gson.fromJson(body,Array<DeserializedData>::class.java)
 
                 if (jsonObj == null){
                     error = true
@@ -132,9 +136,17 @@ object Price : CommandExecutor{
 
                 for (obj in jsonObj){
                     val symbol = obj.symbol
-                    dateCount = 0
 
-                    finalDate = obj.time
+                    //最終取得の日付が現在と異なっていたら日付更新
+                    if (dateStr != obj.time){
+                        lastGotDate = Date()
+                    }
+
+                    //指定秒数超えたらエラー扱い
+                    if (Date().time - lastGotDate.time> errorSecond*1000){
+                        error = true
+                        continue@Main
+                    }
 
                     val symbolSetting = Forex.symbols[symbol]?:continue
 

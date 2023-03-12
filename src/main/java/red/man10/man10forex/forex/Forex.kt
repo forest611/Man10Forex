@@ -26,7 +26,9 @@ object Forex {
     var symbolList = mutableListOf<String>()
 
 
-    //シンボルデータ
+    ///////////////////////////////////////////
+    //      シンボルデータ
+    ///////////////////////////////////////////
     class Symbol(private val symbol:String){
 
         var leverage = 100
@@ -41,6 +43,8 @@ object Forex {
             loadConfig()
         }
 
+        //////////////////////
+        //      シンボルのデータを読む
         private fun loadConfig(){
             plugin.reloadConfig()
 
@@ -101,13 +105,19 @@ object Forex {
         }.start()
     }
 
+    /////////////////////////////////
+    //      FX関連のデータを読む
+    //////////////////////////////////
     fun loadConfig(){
         plugin.reloadConfig()
 
         symbolList = plugin.config.getStringList("SymbolList")//使う銘柄のリスト
-        Price.url = plugin.config.getString("PriceURL")?:""
         lossCutPercent = plugin.config.getDouble("LossCutPercent")
         overallMaxLot = plugin.config.getDouble("OverAllMaxLot")
+
+        Price.url = plugin.config.getString("PriceURL")?:""
+        Price.errorSecond = plugin.config.getInt("ErrorSecond")
+        Price.threadInterval = plugin.config.getInt("ThreadInterval")
 
         MarketStatus.entry = plugin.config.getBoolean("Status.Entry")
         MarketStatus.exit = plugin.config.getBoolean("Status.Exit")
