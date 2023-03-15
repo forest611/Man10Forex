@@ -17,7 +17,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 object Price : CommandExecutor{
 
-    var url = "http://taro:824/api/price"
+    var url = ""
 
     private val gson = Gson()
 
@@ -139,6 +139,7 @@ object Price : CommandExecutor{
 
                     //最終取得の日付が現在と異なっていたら日付更新
                     if (dateStr != obj.time){
+                        dateStr = obj.time
                         lastGotDate = Date()
                     }
 
