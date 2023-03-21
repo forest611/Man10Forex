@@ -138,7 +138,7 @@ object Price : CommandExecutor{
                     val symbol = obj.symbol
 
                     //最終取得の日付が現在と異なっていたら日付更新
-                    if (dateStr != obj.time){
+                    if (symbol == Forex.symbolList[0] && dateStr != obj.time){
                         dateStr = obj.time
                         lastGotDate = Date()
                     }
@@ -146,6 +146,7 @@ object Price : CommandExecutor{
                     //指定秒数超えたらエラー扱い
                     if (Date().time - lastGotDate.time> errorSecond*1000){
                         error = true
+                        Bukkit.getLogger().warning("Oandaサーバーの不具合が起きている可能性があります")
                         continue@Main
                     }
 
