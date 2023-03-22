@@ -1,9 +1,9 @@
 name: Man10Forex
 version: '1.0'
 main: red.man10.man10forex.Man10Forex
-softdepend:
+depend:
   - Man10Bank
-  - Man10CommonLibs
+#  - Man10CommonLibs
 api-version: 1.19
 commands:
   mhl:

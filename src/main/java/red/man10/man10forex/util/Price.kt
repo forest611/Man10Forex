@@ -113,7 +113,7 @@ object Price : CommandExecutor{
                 Thread.sleep(threadInterval.toLong())
 
                 if (error){
-                    Bukkit.getLogger().info("ConnectError")
+                    Bukkit.getLogger().warning("ConnectError")
                     client.connectionPool.evictAll()
                 }
 
@@ -147,7 +147,7 @@ object Price : CommandExecutor{
                     if (Date().time - lastGotDate.time> errorSecond*1000){
                         error = true
                         Bukkit.getLogger().warning("Oandaサーバーの不具合が起きている可能性があります")
-                        continue@Main
+//                        continue@Main
                     }
 
                     val symbolSetting = Forex.symbols[symbol]?:continue
