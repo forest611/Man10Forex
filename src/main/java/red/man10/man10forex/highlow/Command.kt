@@ -44,6 +44,11 @@ object Command : CommandExecutor{
                 return true
             }
 
+            if (Price.error){
+                sender.sendMessage("${prefix}価格取得に失敗！しばらく続く場合、サーバーにレポートを送ってください。")
+                return true
+            }
+
             Menu(sender).open()
             return true
         }
