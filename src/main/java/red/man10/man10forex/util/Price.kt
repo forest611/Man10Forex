@@ -150,6 +150,8 @@ object Price : CommandExecutor{
 
                         if (!error){
                             Bukkit.getLogger().warning("${errorSecond}秒以上のJsonの変更なし、Oandaサーバーの不具合が起きている可能性があります")
+
+                            Runtime.getRuntime().exec("python3 ./"+Man10Forex.plugin.dataFolder.path+"/error_notify.py")
                         }
                         error = true
                         continue@Main
