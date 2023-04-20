@@ -381,6 +381,14 @@ object Forex {
     }
     private fun asyncExit(uuid: UUID, pos:UUID, isLossCut:Boolean, sql: MySQLManager, exitPrice: Double? = null){
 
+        //オンラインだったらメッセージを送る
+        val p = Bukkit.getOfflinePlayer(uuid).player
+
+        if (Price.error){
+            p?.sendMessage("${prefix}§c§l決済失敗。価格取得ができないため決済ができません")
+            return
+        }
+
         val list = asyncGetUserPositions(uuid, sql)
 //        var position: Position? = null
 //
@@ -416,10 +424,7 @@ object Forex {
 
         sql.execute("UPDATE position_table SET `exit` = 1, exit_price = ${price}, profit = ${profit}, exit_date = now() WHERE position_id = '${position.positionID}';")
 
-        //オンラインだったらメッセージを送る
-        val p = Bukkit.getOfflinePlayer(uuid).player?:return
-        p.sendMessage("${prefix}ポジションを決済しました！(損益:${Utility.moneyFormat(profit)})")
-
+        p?.sendMessage("${prefix}ポジションを決済しました！(損益:${Utility.moneyFormat(profit)})")
     }
 
     fun asyncGetUserPositions(uuid:UUID, sql:MySQLManager): MutableList<Position> {
