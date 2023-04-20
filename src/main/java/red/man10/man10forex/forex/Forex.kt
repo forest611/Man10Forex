@@ -371,13 +371,10 @@ object Forex {
     fun exitAll(uuid:UUID){
 
         jobQueue.add{sql ->
-
             val pos = asyncGetUserPositions(uuid,sql)
 
             pos.forEach { asyncExit(uuid,it.positionID,false,sql) }
-
         }
-
     }
     private fun asyncExit(uuid: UUID, pos:UUID, isLossCut:Boolean, sql: MySQLManager, exitPrice: Double? = null){
 
@@ -390,15 +387,7 @@ object Forex {
         }
 
         val list = asyncGetUserPositions(uuid, sql)
-//        var position: Position? = null
-//
-//        list.forEach {
-//            if (it.positionID == pos){
-//                position = it
-//                return@forEach
-//            }
-//        }
-//
+
         val position = list.firstOrNull { it.positionID == pos } ?: return
 
         val symbol = position.symbol

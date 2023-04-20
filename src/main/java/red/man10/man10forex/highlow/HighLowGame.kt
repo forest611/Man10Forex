@@ -5,6 +5,7 @@ import org.bukkit.entity.Player
 import red.man10.man10forex.Man10Forex
 import red.man10.man10forex.Man10Forex.Companion.bank
 import red.man10.man10forex.util.MySQLManager
+import red.man10.man10forex.util.Price
 import red.man10.man10forex.util.Price.price
 import java.lang.Exception
 import java.util.*
@@ -67,7 +68,15 @@ object HighLowGame {
     private fun exit(position:Position){
 
         val p = Bukkit.getOfflinePlayer(position.uuid)
-        var price = price(symbol)
+
+        //価格取得失敗した時は返金するように
+        if (Price.error){
+            p.player?.sendMessage("${prefix}価格取得失敗したためゲームを中断します")
+            payback(position)
+            return
+        }
+
+        val price = price(symbol)
 
         val isWin = if (position.isHigh){
             price>position.entryPrice
