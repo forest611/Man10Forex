@@ -113,8 +113,8 @@ object Price : CommandExecutor{
                 Thread.sleep(threadInterval.toLong())
 
                 if (error){
-                    Bukkit.getLogger().warning("ConnectError")
                     client.connectionPool.evictAll()
+//                    Bukkit.getLogger().warning("接続エラーが発生したため接続をリセットします")
                 }
 
                 val request = Request.Builder().url(url).build()
@@ -129,6 +129,7 @@ object Price : CommandExecutor{
 
                 val jsonObj = gson.fromJson(body,Array<DeserializedData>::class.java)
 
+                //Jsonがからの場合は止める
                 if (jsonObj == null){
                     error = true
                     continue@Main
@@ -141,13 +142,17 @@ object Price : CommandExecutor{
                     if (symbol == Forex.symbolList[0] && dateStr != obj.time){
                         dateStr = obj.time
                         lastGotDate = Date()
+                        error = false
                     }
 
                     //指定秒数超えたらエラー扱い
                     if (Date().time - lastGotDate.time> errorSecond*1000){
+
+                        if (!error){
+                            Bukkit.getLogger().warning("${errorSecond}秒以上のJsonの変更なし、Oandaサーバーの不具合が起きている可能性があります")
+                        }
                         error = true
-                        Bukkit.getLogger().warning("Oandaサーバーの不具合が起きている可能性があります")
-//                        continue@Main
+                        continue@Main
                     }
 
                     val symbolSetting = Forex.symbols[symbol]?:continue
@@ -166,8 +171,6 @@ object Price : CommandExecutor{
                         notifyChangePrice(symbol,lastData.price,price)
                     }
                 }
-
-                error = false
             }catch (e:InterruptedException){
                 Bukkit.getLogger().info("PriceThreadInterrupt")
                 break@Main
@@ -199,10 +202,10 @@ object Price : CommandExecutor{
             return true
         }
 
-        if (args.size!=2){
-            sender.sendMessage("/zfx price/bid/ask symbol")
-            return true
-        }
+//        if (args.size!=2){
+//            sender.sendMessage("/zfx price/bid/ask symbol")
+//            return true
+//        }
 
         val symbol = args[1]
 
@@ -222,6 +225,14 @@ object Price : CommandExecutor{
                     sender.sendMessage("§a価格変更通知をオンにしました")
                 }
                 notifyPlayer[symbol] = list
+            }
+
+            "status" ->{
+                if (error){
+                    sender.sendMessage("価格取得失敗")
+                }else{
+                    sender.sendMessage("価格取得成功")
+                }
             }
 
             "price" ->{
