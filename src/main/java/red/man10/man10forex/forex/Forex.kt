@@ -529,6 +529,12 @@ object Forex {
             val list = asyncGetUserPositions(uuid, sql)
 
             list.forEach {
+
+                if (Price.price(it.symbol)<0){
+                    Bukkit.getLogger().warning("価格取得失敗の可能性 TPSLチェックをスルーします")
+                    return@forEach
+                }
+
                 if (it.buy){
                     val bid = Price.bid(it.symbol)
 
