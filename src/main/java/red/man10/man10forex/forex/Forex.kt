@@ -392,6 +392,12 @@ object Forex {
 
         val symbol = position.symbol
 
+        if (Price.price(symbol)<0){
+            p?.sendMessage("${prefix}§c§l決済失敗。価格取得ができないため決済ができません")
+            Bukkit.getLogger().warning("価格取得失敗の可能性 Exitをスルー")
+            return
+        }
+
         val price = exitPrice ?: if (position.buy) Price.bid(symbol) else Price.ask(symbol)
         var profit = profit(position,price)
 
