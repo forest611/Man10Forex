@@ -2,6 +2,7 @@ package red.man10.man10forex.forex
 
 import org.bukkit.Bukkit
 import org.bukkit.entity.Player
+import red.man10.man10forex.Man10Forex.Companion.bank
 import red.man10.man10forex.Man10Forex.Companion.plugin
 import red.man10.man10forex.forex.Forex.Job
 import red.man10.man10forex.util.MySQLManager
@@ -565,6 +566,29 @@ object Forex {
                     }
                 }
             }
+        }
+
+        jobQueue.add(job)
+    }
+
+    fun refund(pos: UUID){
+        val job = Job { sql ->
+
+            val rs = sql.query("select * from position_table where position_id='${pos}' and refund=0")
+
+            if (rs == null || !rs.next())return@Job
+
+            val profit = rs.getDouble("profit")
+            val uuid = UUID.fromString(rs.getString("uuid"))
+
+            val ret = ForexBank.deposit(uuid,-profit,"refund","返金")
+
+            if (ret){
+                val p = Bukkit.getOfflinePlayer(uuid)
+                p.player?.sendMessage("${prefix}§c§l${Utility.format(-profit)}円の返金を行いました")
+            }
+
+            sql.execute("update position_table set refund=1 where position_id='${pos}'")
         }
 
         jobQueue.add(job)

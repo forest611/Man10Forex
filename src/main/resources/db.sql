@@ -10,7 +10,7 @@ create table log
         primary key (id)
 );
 
-create table if not exists position_table
+create table position_table
 (
     id          int auto_increment
         primary key,
@@ -21,18 +21,21 @@ create table if not exists position_table
     buy         tinyint    default 0                 null,
     sell        tinyint    default 0                 null,
     `exit`      tinyint    default 0                 null,
-    symbol      varchar(8)                           null,
+    symbol      varchar(8) default 'USDJPY'          null,
     entry_price double                               null,
     exit_price  double                               null,
     profit      double                               null,
     entry_date  datetime   default CURRENT_TIMESTAMP null,
     exit_date   datetime                             null,
     sl_price    double     default 0                 null,
-    tp_price    double     default 0                 null
+    tp_price    double     default 0                 null,
+    refund      tinyint    default 0                 null
 );
 
 create index position_table_exit_uuid_index
     on position_table (`exit`, uuid);
+
+
 
 create table if not exists pending_table
 (

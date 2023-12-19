@@ -72,9 +72,11 @@ object Command :CommandExecutor{
 
                 if (sender.hasPermission(OP)){
                     sender.sendMessage("${prefix}§c§l/mfx bal <mcid> ... 指定ユーザーの口座をみます")
+                    sender.sendMessage("${prefix}§c§l/mfx historyop <mcid> ... 指定ユーザーの履歴をみます")
                     sender.sendMessage("${prefix}§c§l/mfx reload ... Configなどを読み直します")
                     sender.sendMessage("${prefix}§c§l/mfx status <Status> true/false ... ステータスのON/OFF")
                     sender.sendMessage("${prefix}§c§l/mfx exitop ... ボタンでのみ有効")
+                    sender.sendMessage("${prefix}§c§l/mfx refund ... ボタンでのみ有効")
                 }
 
             }
@@ -434,6 +436,25 @@ object Command :CommandExecutor{
                 Forex.exit(p,id,false,price)
 
             }
+
+            "historyop"->{//mfx historyop mcid page
+                if (!sender.hasPermission(OP)){return false}
+
+                val mcid = args[1]
+                val page = args[2].toIntOrNull()?:0
+
+                Thread{
+                    showHistoryOP(sender, MySQLManager(plugin,""), mcid,page)
+                }.start()
+            }
+
+            "refund" ->{//mfx refund pos
+                if (!sender.hasPermission(OP))return true
+
+                val id = UUID.fromString(args[1])
+
+                Forex.refund(id)
+            }
         }
 
         return true
@@ -557,104 +578,6 @@ object Command :CommandExecutor{
         p.sendMessage(prefix.append(boardButton))
     }
 
-    private fun showPriceBoard(p:Player,sql: MySQLManager){
-        p.sendMessage("${prefix}エントリーをする(価格は${sdf.format(Date())}時点のものです)")
-        val list = asyncGetUserPositions(p.uniqueId,sql)
-
-        val prefix = text(prefix)
-
-        for (symbol in Forex.symbolList){
-
-            val digits = symbols[symbol]?.pipsAmount.toString().length
-
-            val symbolText = text("§e§l${symbol} ")
-            val sellButton = text("§c§l§n${isAllowed(Forex.MarketStatus.entry)}[売(${format(Price.ask(symbol),digits)})]")
-                .clickEvent(ClickEvent.suggestCommand("/mfx sell $symbol "))
-                .hoverEvent(HoverEvent.showText(text("§c現在価格より下回ったら利益がでます\n§c/mfx sell $symbol <ロット数>(0.01〜1000)")))
-            val maxLot = text(" §f§l最大${format(getMaxLots(p.uniqueId,Price.price(symbol),list,symbol),2)}ロット ")
-            val buyButton = text("§a§l§n${isAllowed(Forex.MarketStatus.entry)}[買(${format(Price.bid(symbol),digits)})]")
-                .clickEvent(ClickEvent.suggestCommand("/mfx buy $symbol "))
-                .hoverEvent(HoverEvent.showText(text("§a現在価格より上回ったら利益がでます\n§a/mfx buy $symbol <ロット数>(0.01〜1000)")))
-
-            val notifyButton = text(" §f§l§n[価格変更通知]").clickEvent(ClickEvent.runCommand("/zfx notify $symbol"))
-
-            p.sendMessage(prefix.append(symbolText).append(sellButton).append(maxLot).append(buyButton).append(notifyButton))
-        }
-
-    }
-
-    private fun showHistory(p:Player, sql:MySQLManager, page:Int = 0){
-
-        val rs = sql.query("select * from position_table where uuid='${p.uniqueId}' and `exit`=1 order by exit_date desc;")?:return
-
-        val list = mutableListOf<PositionHistory>()
-
-        while (rs.next()){
-
-            val data = PositionHistory(
-                rs.getDate("entry_date"),
-                rs.getDate("exit_date"),
-                rs.getString("symbol"),
-                rs.getInt("buy") == 1,
-                rs.getDouble("entry_price"),
-                rs.getDouble("exit_price"),
-                rs.getDouble("lots"),
-                rs.getDouble("profit")
-            )
-
-            list.add(data)
-        }
-
-        rs.close()
-        sql.close()
-
-        val netProfit = list.sumOf { it.profit }
-        val profit = list.filter { it.profit>0 }.sumOf { it.profit }
-        val loss = list.filter { it.profit<0 }.sumOf { it.profit }
-        val profitFactor = profit/loss
-        val hasPrevious = page>0
-        var hasNext = true
-
-        p.sendMessage("${prefix}§e§l=====トレードヒストリー=====")
-
-        for (i in page*10 until page*10+10){
-            if (list.size<=i){
-                hasNext = false
-                break
-            }
-
-            val data = list[i]
-
-            val hover = text("${if (data.isBuy) "§b§l買" else "§c§l売"}\n" +
-                    "§f§l銘柄:${data.symbol}\n" +
-                    "§f§l${ format(data.lot,2)}ロット\n" +
-                    "§f§l${format(data.entry,3)}→${format(data.exit,3)}\n" +
-                    "§f§l損益:${if (data.profit>0) "§b§l" else if (data.profit<0) "§c§l" else ""} ${format(data.profit,0)}円\n" +
-                    "§f§l決済時刻:${sdf.format(data.exitDate)}")
-
-            val msg = text("$prefix${if (data.isBuy) "§b§l買" else "§c§l売"} §f§l${ format(data.lot,2)}ロット ${data.symbol} " +
-                    "${if (data.profit>0) "§b§l" else if (data.profit<0) "§c§l" else ""} ${format(data.profit,0)}円").hoverEvent(HoverEvent.showText(hover))
-
-            p.sendMessage(msg)
-        }
-
-        p.sendMessage("${prefix}§a§lトータル損益:${if (netProfit>=0) "§b§l" else "§c§l"} ${format(netProfit,0)}円")
-        p.sendMessage("${prefix}§a§lプロフィットファクター:${if (profitFactor>=0) "§b§l" else "§c§l"} ${format(profitFactor,2)}")
-
-        var prefix = text(prefix)
-        val previous = text("§f§l§n[前のページ]").clickEvent(ClickEvent.runCommand("/mfx history ${page-1}"))
-        val next = text("§f§l§n[次のページ]").clickEvent(ClickEvent.runCommand("/mfx history ${page+1}"))
-
-        if (hasPrevious){
-            prefix = prefix.append(previous)
-        }
-        if (hasNext){
-            prefix = prefix.append(next)
-        }
-
-        p.sendMessage(prefix)
-    }
-
     private fun showBalanceOP(p:CommandSender,sql: MySQLManager,mcid:String){
 
         val uuid = Bank.getUUID(mcid)?:return
@@ -670,6 +593,7 @@ object Command :CommandExecutor{
 
         val percentMsg = text("${prefix}${percentColor}維持率:${format(percent,3)}%")
             .hoverEvent(HoverEvent.showText(text("§c§l維持率が20.0%を下回ると、ポジションが強制的に決済されます")))
+        val historyButton = text("               §e§l§n[履歴を見る(OP)]").clickEvent(ClickEvent.runCommand("/mfx historyop 0"))
 
         val balanceMsg = text("${prefix}残高:${moneyFormat(balance)}               ")
             .hoverEvent(HoverEvent.showText(text("§f§nFXの口座は、銀行口座と別のものを使用します")))
@@ -680,7 +604,7 @@ object Command :CommandExecutor{
         p.sendMessage(balanceMsg)
         p.sendMessage("${prefix}有効金額:${moneyFormat(margin)}")
         p.sendMessage("${prefix}${profitColor}評価額:${moneyFormat(allProfit)}")
-        p.sendMessage(percentMsg)
+        p.sendMessage(percentMsg.append(historyButton))
         p.sendMessage("${prefix}===============保有ポジション===============")
 
         list.forEach {
@@ -722,6 +646,191 @@ object Command :CommandExecutor{
         }
     }
 
+    private fun showPriceBoard(p:Player,sql: MySQLManager){
+        p.sendMessage("${prefix}エントリーをする(価格は${sdf.format(Date())}時点のものです)")
+        val list = asyncGetUserPositions(p.uniqueId,sql)
+
+        val prefix = text(prefix)
+
+        for (symbol in Forex.symbolList){
+
+            val digits = symbols[symbol]?.pipsAmount.toString().length
+
+            val symbolText = text("§e§l${symbol} ")
+            val sellButton = text("§c§l§n${isAllowed(Forex.MarketStatus.entry)}[売(${format(Price.ask(symbol),digits)})]")
+                .clickEvent(ClickEvent.suggestCommand("/mfx sell $symbol "))
+                .hoverEvent(HoverEvent.showText(text("§c現在価格より下回ったら利益がでます\n§c/mfx sell $symbol <ロット数>(0.01〜1000)")))
+            val maxLot = text(" §f§l最大${format(getMaxLots(p.uniqueId,Price.price(symbol),list,symbol),2)}ロット ")
+            val buyButton = text("§a§l§n${isAllowed(Forex.MarketStatus.entry)}[買(${format(Price.bid(symbol),digits)})]")
+                .clickEvent(ClickEvent.suggestCommand("/mfx buy $symbol "))
+                .hoverEvent(HoverEvent.showText(text("§a現在価格より上回ったら利益がでます\n§a/mfx buy $symbol <ロット数>(0.01〜1000)")))
+
+            val notifyButton = text(" §f§l§n[価格変更通知]").clickEvent(ClickEvent.runCommand("/zfx notify $symbol"))
+
+            p.sendMessage(prefix.append(symbolText).append(sellButton).append(maxLot).append(buyButton).append(notifyButton))
+        }
+
+    }
+
+    private fun showHistory(p:Player, sql:MySQLManager, page:Int = 0){
+
+        val rs = sql.query("select * from position_table where uuid='${p.uniqueId}' and `exit`=1 order by exit_date desc;")?:return
+
+        val list = mutableListOf<PositionHistory>()
+
+        while (rs.next()){
+
+            val data = PositionHistory(
+                UUID.fromString(rs.getString("position_id")),
+                rs.getDate("entry_date"),
+                rs.getDate("exit_date"),
+                rs.getString("symbol"),
+                rs.getInt("buy") == 1,
+                rs.getDouble("entry_price"),
+                rs.getDouble("exit_price"),
+                rs.getDouble("lots"),
+                rs.getDouble("profit"),
+                rs.getInt("refund") == 1
+            )
+
+            list.add(data)
+        }
+
+        rs.close()
+        sql.close()
+
+        val netProfit = list.sumOf { it.profit }
+        val profit = list.filter { it.profit>0 }.sumOf { it.profit }
+        val loss = list.filter { it.profit<0 }.sumOf { it.profit }
+        val profitFactor = profit/loss
+        val hasPrevious = page>0
+        var hasNext = true
+
+        p.sendMessage("${prefix}§e§l=====トレードヒストリー=====")
+
+        for (i in page*10 until page*10+10){
+            if (list.size<=i){
+                hasNext = false
+                break
+            }
+
+            val data = list[i]
+
+            val hover = text("${if (data.isBuy) "§b§l買" else "§c§l売"}\n" +
+                    "§f§l銘柄:${data.symbol}\n" +
+                    "§f§l${ format(data.lot,2)}ロット\n" +
+                    "§f§l${format(data.entry,3)}→${format(data.exit,3)}\n" +
+                    "§f§l損益:${if (data.profit>0) "§b§l" else if (data.profit<0) "§c§l" else ""} ${format(data.profit,0)}円\n" +
+                    "§f§l決済時刻:${sdf.format(data.exitDate)}")
+
+            val msg = text("$prefix${if (data.isRefund) "§c§l[返金]" else ""}${if (data.isBuy) "§b§l買" else "§c§l売"} §f§l${ format(data.lot,2)}ロット ${data.symbol} " +
+                    "${if (data.profit>0) "§b§l" else if (data.profit<0) "§c§l" else ""} ${format(data.profit,0)}円").hoverEvent(HoverEvent.showText(hover))
+
+            p.sendMessage(msg)
+        }
+
+        p.sendMessage("${prefix}§a§lトータル損益:${if (netProfit>=0) "§b§l" else "§c§l"} ${format(netProfit,0)}円")
+        p.sendMessage("${prefix}§a§lプロフィットファクター:${if (profitFactor>=0) "§b§l" else "§c§l"} ${format(profitFactor,2)}")
+
+        var prefix = text(prefix)
+        val previous = text("§f§l§n[前のページ]").clickEvent(ClickEvent.runCommand("/mfx history ${page-1}"))
+        val next = text("§f§l§n[次のページ]").clickEvent(ClickEvent.runCommand("/mfx history ${page+1}"))
+
+        if (hasPrevious){
+            prefix = prefix.append(previous)
+        }
+        if (hasNext){
+            prefix = prefix.append(next)
+        }
+
+        p.sendMessage(prefix)
+    }
+
+    private fun showHistoryOP(p:CommandSender, sql:MySQLManager,mcid:String, page:Int = 0){
+
+        val uuid = Bank.getUUID(mcid)
+
+        val rs = sql.query("select * from position_table where uuid='${uuid}' and `exit`=1 order by exit_date desc;")?:return
+
+        val list = mutableListOf<PositionHistory>()
+
+        while (rs.next()){
+
+            val data = PositionHistory(
+                UUID.fromString(rs.getString("position_id")),
+                rs.getDate("entry_date"),
+                rs.getDate("exit_date"),
+                rs.getString("symbol"),
+                rs.getInt("buy") == 1,
+                rs.getDouble("entry_price"),
+                rs.getDouble("exit_price"),
+                rs.getDouble("lots"),
+                rs.getDouble("profit"),
+                rs.getInt("refund") == 1
+            )
+
+            list.add(data)
+        }
+
+        rs.close()
+        sql.close()
+
+        val netProfit = list.sumOf { it.profit }
+        val profit = list.filter { it.profit>0 }.sumOf { it.profit }
+        val loss = list.filter { it.profit<0 }.sumOf { it.profit }
+        val profitFactor = profit/loss
+        val hasPrevious = page>0
+        var hasNext = true
+
+        p.sendMessage("${prefix}§c§l=====${mcid}のトレードヒストリー=====")
+
+        for (i in page*10 until page*10+10){
+            if (list.size<=i){
+                hasNext = false
+                break
+            }
+
+            val data = list[i]
+
+            val hover = text("${if (data.isBuy) "§b§l買" else "§c§l売"}\n" +
+                    "§f§l銘柄:${data.symbol}\n" +
+                    "§f§l${ format(data.lot,2)}ロット\n" +
+                    "§f§l${format(data.entry,3)}→${format(data.exit,3)}\n" +
+                    "§f§l損益:${if (data.profit>0) "§b§l" else if (data.profit<0) "§c§l" else ""} ${format(data.profit,0)}円\n" +
+                    "§f§l決済時刻:${sdf.format(data.exitDate)}")
+
+            var msg = text("$prefix${if (data.isRefund) "§c§l[返金]" else ""}${if (data.isBuy) "§b§l買" else "§c§l売"} §f§l${ format(data.lot,2)}ロット ${data.symbol} " +
+                    "${if (data.profit>0) "§b§l" else if (data.profit<0) "§c§l" else ""} ${format(data.profit,0)}円").hoverEvent(HoverEvent.showText(hover))
+
+            //負けてる場合は返金の選択肢を出す
+            if (data.profit<0){
+                val refund = text(" §c§l[返金]").clickEvent(ClickEvent.runCommand("/mfx refund ${data.id}"))
+                msg = msg.append(refund)
+            }
+
+
+            p.sendMessage(msg)
+        }
+
+        p.sendMessage("${prefix}§a§lトータル損益:${if (netProfit>=0) "§b§l" else "§c§l"} ${format(netProfit,0)}円")
+        p.sendMessage("${prefix}§a§lプロフィットファクター:${if (profitFactor>=0) "§b§l" else "§c§l"} ${format(profitFactor,2)}")
+
+        var prefix = text(prefix)
+        val previous = text("§f§l§n[前のページ]").clickEvent(ClickEvent.runCommand("/mfx history ${page-1}"))
+        val next = text("§f§l§n[次のページ]").clickEvent(ClickEvent.runCommand("/mfx history ${page+1}"))
+
+        if (hasPrevious){
+            prefix = prefix.append(previous)
+        }
+        if (hasNext){
+            prefix = prefix.append(next)
+        }
+
+        p.sendMessage(prefix)
+    }
+
+
+
     private fun showStat(p: CommandSender, sql: MySQLManager){
 
         val rs = sql.query("select * from position_table where `exit`=1 order by exit_date desc;")?:return
@@ -731,6 +840,7 @@ object Command :CommandExecutor{
         while (rs.next()){
 
             val data = PositionHistory(
+                UUID.fromString(rs.getString("position_id")),
                 rs.getDate("entry_date"),
                 rs.getDate("exit_date"),
                 rs.getString("symbol"),
@@ -738,7 +848,8 @@ object Command :CommandExecutor{
                 rs.getDouble("entry_price"),
                 rs.getDouble("exit_price"),
                 rs.getDouble("lots"),
-                rs.getDouble("profit")
+                rs.getDouble("profit"),
+                rs.getInt("refund") == 1
             )
 
             list.add(data)
@@ -770,6 +881,7 @@ object Command :CommandExecutor{
     }
 
     data class PositionHistory(
+        var id : UUID,
         var entryDate : Date,
         var exitDate : Date,
         var symbol : String,
@@ -777,6 +889,7 @@ object Command :CommandExecutor{
         var entry : Double,
         var exit : Double,
         var lot : Double,
-        var profit : Double
+        var profit : Double,
+        var isRefund : Boolean
     )
 }
