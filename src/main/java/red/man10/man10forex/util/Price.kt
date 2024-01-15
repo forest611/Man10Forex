@@ -1,6 +1,7 @@
 package red.man10.man10forex.util
 
 import com.google.gson.Gson
+import net.kyori.adventure.text.Component
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.bukkit.Bukkit
@@ -30,6 +31,8 @@ object Price : CommandExecutor{
     private var priceThread = Thread{asyncGetPriceThread()}
 
     var error = true
+    private var calledErrorMessage = false
+
     var threadInterval = 100
     var errorSecond = 60 //n秒以上失敗したらエラー扱い
 
@@ -107,14 +110,20 @@ object Price : CommandExecutor{
 
         val client = OkHttpClient.Builder().cache(null).build()
 
+        //プログラム実行中はずっとループさせる
         Main@while (true){
 
             try {
                 Thread.sleep(threadInterval.toLong())
 
+                //エラーが出た場合は一旦コネクションを削除する
                 if (error){
+                    if (!calledErrorMessage){
+                        Bukkit.getLogger().warning("接続エラーが発生したため接続をリセットします")
+                        Bukkit.broadcast(Component.text("mfxエラー Price.kt 1"))
+                        calledErrorMessage=true
+                    }
                     client.connectionPool.evictAll()
-//                    Bukkit.getLogger().warning("接続エラーが発生したため接続をリセットします")
                 }
 
                 val request = Request.Builder().url(url).build()
@@ -123,6 +132,7 @@ object Price : CommandExecutor{
 
                 //レスポンスが返ってこなかったら止める
                 if (body == null){
+                    Bukkit.broadcast(Component.text("mfxエラー Price.kt 2"))
                     error = true
                     continue@Main
                 }
@@ -131,6 +141,7 @@ object Price : CommandExecutor{
 
                 //Jsonがからの場合は止める
                 if (jsonObj == null){
+                    Bukkit.broadcast(Component.text("mfxエラー Price.kt 3"))
                     error = true
                     continue@Main
                 }
@@ -147,17 +158,22 @@ object Price : CommandExecutor{
 
                     //指定秒数超えたらエラー扱い
                     if (Date().time - lastGotDate.time> errorSecond*1000){
-
                         if (!error){
-                            Bukkit.getLogger().warning("${errorSecond}秒以上のJsonの変更なし、Oandaサーバーの不具合が起きている可能性があります")
+                            Bukkit.getLogger().warning("${errorSecond}秒以上のJsonの変更なし、zfxAPIの不具合が起きている可能性があります")
+                            Bukkit.broadcast(Component.text("mfxエラー Price.kt 4"))
 
-                            Runtime.getRuntime().exec("python3 ./"+Man10Forex.plugin.dataFolder.path+"/error_notify.py")
+//                            Runtime.getRuntime().exec("python3 ./"+Man10Forex.plugin.dataFolder.path+"/error_notify.py")
                         }
                         error = true
                         continue@Main
                     }
 
-                    val symbolSetting = Forex.symbols[symbol]?:continue
+                    val symbolSetting = Forex.symbols[symbol]
+
+                    if (symbolSetting == null){
+                        Bukkit.broadcast(Component.text("mfxエラー Price.kt 5"))
+                        continue
+                    }
 
                     val price = (obj.bid+obj.ask)/2.0
                     val ask = price+(Forex.pipsToPrice(symbolSetting.spread,symbol)/2.0)
@@ -178,6 +194,8 @@ object Price : CommandExecutor{
                 break@Main
             } catch (e:java.lang.Exception){
                 error = true
+                Bukkit.broadcast(Component.text("mfxエラー Price.kt -1"))
+                Bukkit.broadcast(Component.text("${e.message}"))
             }
         }
 
@@ -239,6 +257,9 @@ object Price : CommandExecutor{
 
             "price" ->{
 
+                if (error){
+                    sender.sendMessage("§d§l価格取得に失敗しています")
+                }
                 if (symbol=="all"){
                     symbolMap.keys.forEach { sender.sendMessage("§d§l現在価格(${it})....§f§l${String.format("%,.3f",price(it))}") }
                 }else{
