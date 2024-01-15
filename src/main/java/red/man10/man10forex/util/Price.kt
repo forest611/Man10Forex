@@ -171,7 +171,7 @@ object Price : CommandExecutor{
                     val symbolSetting = Forex.symbols[symbol]
 
                     if (symbolSetting == null){
-                        Bukkit.broadcast(Component.text("mfxエラー Price.kt 5"))
+//                        Bukkit.broadcast(Component.text("mfxエラー Price.kt 5"))
                         continue
                     }
 
