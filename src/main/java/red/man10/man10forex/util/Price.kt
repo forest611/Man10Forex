@@ -168,7 +168,7 @@ object Price : CommandExecutor{
                         continue@Main
                     }
 
-                    Bukkit.getLogger().info("最終取得時刻:${lastGotDate.time} (現在時刻との差:${Date().time - lastGotDate.time})")
+//                    Bukkit.getLogger().info("最終取得時刻:${lastGotDate.time} (現在時刻との差:${Date().time - lastGotDate.time})")
 
                     val symbolSetting = Forex.symbols[symbol]
 
